@@ -1,0 +1,15 @@
+{
+ "sae": "v1_qwen3",
+ "feat": 17199,
+ "test": "healthver",
+ "n": 6000,
+ "n_nei": 2548,
+ "n_dec": 3452,
+ "auc_feat_indomain": 0.5949789360312163,
+ "auc_feat": 0.45299678388157116,
+ "auc_dir_indomain": 0.6137809582663866,
+ "auc_dir": 0.4606842937727725,
+ "topk": 200,
+ "nei_top": 0.355,
+ "nei_base": 0.4246666666666667
+}

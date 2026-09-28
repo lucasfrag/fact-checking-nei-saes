@@ -1,0 +1,31 @@
+{
+  "datasets": [
+    {
+      "name": "averitec_dev",
+      "path": "/home/systemp2w/projects/mestrado/corpora/averitec/data/dev.json"
+    }
+  ],
+  "env": {
+    "LLM_BACKEND": "hf",
+    "OLLAMA_MODEL": "gemma3:4b",
+    "HF_MODEL_ID": null,
+    "HF_QUANTIZE_4BIT": null,
+    "HF_MAX_NEW_TOKENS": null,
+    "LLM_TEMPERATURE": null,
+    "LANGUAGE": null,
+    "MAX_QUESTIONS": null,
+    "SEARCH_ENGINE": null,
+    "SEARCH_MAX_RESULTS": null,
+    "SEARCH_MAX_URLS": null,
+    "SEARCH_MAX_WORKERS": null,
+    "BM25_TOP_K": null,
+    "USE_QUESTION_FOR_RETRIEVAL": null,
+    "RERANKER_MODEL": null,
+    "RERANKER_TOP_K": null,
+    "RERANKER_THRESHOLD": null,
+    "USE_RERANKER": null,
+    "CHUNK_SIZE": null
+  },
+  "git_commit": "dc19749692536f736cbd5000f2e56fc3b3d0db29",
+  "created_at": "2026-09-03T22:55:35.650912"
+}

@@ -1,0 +1,7 @@
+torch>=2.5
+transformers>=5.14
+datasets>=3.0
+safetensors>=0.4
+bitsandbytes>=0.44
+numpy>=1.26
+scikit-learn>=1.4

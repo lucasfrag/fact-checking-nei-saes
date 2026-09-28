@@ -1,0 +1,15 @@
+{
+ "sae": "v1_deepseek",
+ "feat": 1937,
+ "test": "climate_fever",
+ "n": 1381,
+ "n_nei": 474,
+ "n_dec": 907,
+ "auc_feat_indomain": 0.6729728763882268,
+ "auc_feat": 0.6233165394331012,
+ "auc_dir_indomain": 0.7957779496324546,
+ "auc_dir": 0.7068929423750576,
+ "topk": 200,
+ "nei_top": 0.56,
+ "nei_base": 0.3432295438088342
+}

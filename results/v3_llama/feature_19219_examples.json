@@ -1,0 +1,475 @@
+{
+ "feat": 19219,
+ "preset": "v3_domain",
+ "n_decisions": 598930,
+ "nei_base": 0.19929040121550098,
+ "n_active": 581316,
+ "frac_active": 0.9705908870819628,
+ "nei_rate_when_active": 0.2039114698374034,
+ "mean_act_nei": 0.12623228132724762,
+ "mean_act_dec": 0.06362331658601761,
+ "auc_feature_topk": 0.7829592861020205,
+ "auc_feature_preact": 0.7829635840948826,
+ "nei_top50": 0.88,
+ "enrich_top50": 4.415666758824071,
+ "nei_top200": 0.935,
+ "enrich_top200": 4.6916459312505765,
+ "nei_top1000": 0.958,
+ "enrich_top1000": 4.8070554033562045,
+ "by_source": {
+  "vitaminc": {
+   "n": 370653,
+   "nei_base": 0.14293962277386127,
+   "nei_top200": 0.775,
+   "auc_feature_topk": 0.7157465335090534
+  },
+  "fever": {
+   "n": 228277,
+   "nei_base": 0.2907870700946657,
+   "nei_top200": 0.99,
+   "auc_feature_topk": 0.8434073791682388
+  }
+ },
+ "top": [
+  {
+   "rank": 1,
+   "idx": 371998,
+   "act": 0.3942,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Cosmopolitan changed its subject matter.",
+   "evidence": [
+    "Patentable subject matter -LRB- or statutory subject matter -RRB- , defining whether patent protection is available"
+   ]
+  },
+  {
+   "rank": 2,
+   "idx": 556559,
+   "act": 0.3899,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Gunday is a bad film.",
+   "evidence": [
+    "Whitecross -LRB- Lanteglos -RRB- , a hamlet near Lanteglos Highway ."
+   ]
+  },
+  {
+   "rank": 3,
+   "idx": 389464,
+   "act": 0.3873,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actress that gave birth on April 12.",
+   "evidence": [
+    "The NASA Star and Exoplanet Database -LRB- NStED -RRB- is an on-line astronomical stellar and exoplanet catalog and data service that collates and cross-correlates astronomical data and information on exoplanets and their host stars ."
+   ]
+  },
+  {
+   "rank": 4,
+   "idx": 575511,
+   "act": 0.3864,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Democratic Party has more money than the Republican Party.",
+   "evidence": [
+    "The following is a list of political parties whose names -LRB- in English -RRB- could be translated to Democratic Party or the Democrats :"
+   ]
+  },
+  {
+   "rank": 5,
+   "idx": 598518,
+   "act": 0.3847,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actress that gave birth on July 15.",
+   "evidence": [
+    "The NASA Star and Exoplanet Database -LRB- NStED -RRB- is an on-line astronomical stellar and exoplanet catalog and data service that collates and cross-correlates astronomical data and information on exoplanets and their host stars ."
+   ]
+  },
+  {
+   "rank": 6,
+   "idx": 163703,
+   "act": 0.3845,
+   "label": "NEI",
+   "source": "vitaminc",
+   "claim": "Boneykapoor is a producer .",
+   "evidence": [
+    "The worldwide gross after 50 days of theatrical run as reported by boneykapoor was ."
+   ]
+  },
+  {
+   "rank": 7,
+   "idx": 434323,
+   "act": 0.3836,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Democratic Party has more 20,000 members than the Republican Party.",
+   "evidence": [
+    "The following is a list of political parties whose names -LRB- in English -RRB- could be translated to Democratic Party or the Democrats :"
+   ]
+  },
+  {
+   "rank": 8,
+   "idx": 453439,
+   "act": 0.3826,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actress born on June 12.",
+   "evidence": [
+    "The NASA Star and Exoplanet Database -LRB- NStED -RRB- is an on-line astronomical stellar and exoplanet catalog and data service that collates and cross-correlates astronomical data and information on exoplanets and their host stars ."
+   ]
+  },
+  {
+   "rank": 9,
+   "idx": 589728,
+   "act": 0.3798,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Gunday is a bad film.",
+   "evidence": [
+    "Whitecross -LRB- Crowlas -RRB- , a hamlet near Crowlas ."
+   ]
+  },
+  {
+   "rank": 10,
+   "idx": 562148,
+   "act": 0.3791,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "There are at least 24 James Bond stores.",
+   "evidence": [
+    "Inspirations for James Bond , the people who Ian Fleming used as an inspiration for James Bond"
+   ]
+  },
+  {
+   "rank": 11,
+   "idx": 519730,
+   "act": 0.3785,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actress born on June 12.",
+   "evidence": [
+    "The following is a list of exoplanetary host stars ."
+   ]
+  },
+  {
+   "rank": 12,
+   "idx": 425683,
+   "act": 0.3771,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "KJ Apab is an existentialist.",
+   "evidence": [
+    "The stated goals of the APAB are :"
+   ]
+  },
+  {
+   "rank": 13,
+   "idx": 564220,
+   "act": 0.3769,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Gendry works in a city.",
+   "evidence": [
+    "The libretto , subtitled Musiktheater in 5 Teilen -LRB- Music Drama in 5 parts -RRB- , was written by the composer ."
+   ]
+  },
+  {
+   "rank": 14,
+   "idx": 486503,
+   "act": 0.3726,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Museum of Science and Industry had French attendees in 2009.",
+   "evidence": [
+    "Warm-core highs -LRB- such as the subtropical ridge and Bermuda-Azores high -RRB- and cold-core lows have strengthening winds with height , with the reverse true for cold-core highs -LRB- shallow arctic highs -RRB- and warm-core lows -LRB- such as tropical cyclones -RRB- ."
+   ]
+  },
+  {
+   "rank": 15,
+   "idx": 489890,
+   "act": 0.3711,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "San Francisco has steep prices.",
+   "evidence": [
+    "Micrathena mitrata Hentz -LRB- Araneidae -RRB- -- White micrathena"
+   ]
+  },
+  {
+   "rank": 16,
+   "idx": 456518,
+   "act": 0.3706,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actor born on June 18.",
+   "evidence": [
+    "The following is a list of exoplanetary host stars ."
+   ]
+  },
+  {
+   "rank": 17,
+   "idx": 496277,
+   "act": 0.3704,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Belgium is 41% forest.",
+   "evidence": [
+    "USS Epping Forest -LRB- LSD-4 -RRB-"
+   ]
+  },
+  {
+   "rank": 18,
+   "idx": 406138,
+   "act": 0.3703,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "System of a Down briefly disbanded in limbo.",
+   "evidence": [
+    "In Limbo -LRB- novel -RRB- , by Christopher Evans"
+   ]
+  },
+  {
+   "rank": 19,
+   "idx": 593655,
+   "act": 0.3692,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actor born on June 20.",
+   "evidence": [
+    "The following is a list of exoplanetary host stars ."
+   ]
+  },
+  {
+   "rank": 20,
+   "idx": 465398,
+   "act": 0.3686,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Amoxicillin can be injected in cases where the patient cannot swallow.",
+   "evidence": [
+    "A cannot-link constraint is used to specify that the two instances in the cannot-link relation should not be associated with the same cluster ."
+   ]
+  },
+  {
+   "rank": 21,
+   "idx": 541105,
+   "act": 0.3685,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Isis had a temple outside the Nile Delta.",
+   "evidence": [
+    "From north to south the delta is approximately in length ."
+   ]
+  },
+  {
+   "rank": 22,
+   "idx": 236488,
+   "act": 0.3682,
+   "label": "NEI",
+   "source": "vitaminc",
+   "claim": "According to Box Office India , Meri Pyaari Bindu was a box-office flop .",
+   "evidence": [
+    "The film had a total gross of ."
+   ]
+  },
+  {
+   "rank": 23,
+   "idx": 170489,
+   "act": 0.3682,
+   "label": "REF",
+   "source": "vitaminc",
+   "claim": "The Times of India announced the global total gross of Nerkonda Paarvai .",
+   "evidence": [
+    "The worldwide gross after 50 days of theatrical run as reported by Boney Kapoor was ."
+   ]
+  },
+  {
+   "rank": 24,
+   "idx": 540346,
+   "act": 0.368,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Overwatch touts a list of technical specifications.",
+   "evidence": [
+    "Overwatch may refer to :"
+   ]
+  },
+  {
+   "rank": 25,
+   "idx": 162022,
+   "act": 0.3679,
+   "label": "SUP",
+   "source": "vitaminc",
+   "claim": "Boneykapoor is a producer .",
+   "evidence": [
+    "The worldwide gross after 50 days of theatrical run as reported by producer boneykapoor was ."
+   ]
+  },
+  {
+   "rank": 26,
+   "idx": 459943,
+   "act": 0.3667,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actor born on June 20.",
+   "evidence": [
+    "The NASA Star and Exoplanet Database -LRB- NStED -RRB- is an on-line astronomical stellar and exoplanet catalog and data service that collates and cross-correlates astronomical data and information on exoplanets and their host stars ."
+   ]
+  },
+  {
+   "rank": 27,
+   "idx": 576376,
+   "act": 0.3659,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars an actor born on June 18.",
+   "evidence": [
+    "The NASA Star and Exoplanet Database -LRB- NStED -RRB- is an on-line astronomical stellar and exoplanet catalog and data service that collates and cross-correlates astronomical data and information on exoplanets and their host stars ."
+   ]
+  },
+  {
+   "rank": 28,
+   "idx": 459810,
+   "act": 0.3658,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars a Slovenian model.",
+   "evidence": [
+    "The following is a list of exoplanetary host stars ."
+   ]
+  },
+  {
+   "rank": 29,
+   "idx": 149328,
+   "act": 0.3657,
+   "label": "NEI",
+   "source": "vitaminc",
+   "claim": "There were more than 400,000 villages in India between 1658 and 1707 under the reign of the Mughal ruler Aurangzeb .",
+   "evidence": [
+    "Social Science Review , Volume 14 , Issue 1 , page 126 , Dhaka UniversityThe population of India under the British Raj ( including what are now Pakistan and Bangladesh ) according to censuses :"
+   ]
+  },
+  {
+   "rank": 30,
+   "idx": 458957,
+   "act": 0.3654,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Ireland has relatively low-lying houses.",
+   "evidence": [
+    "A relatively high A-VIX value implies that the market expects significant changes in the S&P / ASX 200 , while a relatively low A-VIX value implies that the market expects minimal change ."
+   ]
+  },
+  {
+   "rank": 31,
+   "idx": 541010,
+   "act": 0.365,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Attack the Block stars a vegan.",
+   "evidence": [
+    "Block may refer to :"
+   ]
+  },
+  {
+   "rank": 32,
+   "idx": 384615,
+   "act": 0.3647,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars a Slovenian actress.",
+   "evidence": [
+    "The following is a list of exoplanetary host stars ."
+   ]
+  },
+  {
+   "rank": 33,
+   "idx": 158089,
+   "act": 0.3647,
+   "label": "NEI",
+   "source": "vitaminc",
+   "claim": "J. R. Smith had less than 3 rebounds per game in his first year with the New Orleans Hornets .",
+   "evidence": [
+    "Smith loves eating balut and playing tong its ."
+   ]
+  },
+  {
+   "rank": 34,
+   "idx": 418850,
+   "act": 0.3635,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "J.Lo was considered more daring than Rebirth.",
+   "evidence": [
+    "This cycle is considered to be dhukkha , unsatisfactory and painful ."
+   ]
+  },
+  {
+   "rank": 35,
+   "idx": 323808,
+   "act": 0.3632,
+   "label": "REF",
+   "source": "vitaminc",
+   "claim": "The Connaught Tunnel was lined with a material .",
+   "evidence": [
+    "The film was released in the U.S in 2016 , earning $ 200,000 during its opening weekend ."
+   ]
+  },
+  {
+   "rank": 36,
+   "idx": 167976,
+   "act": 0.3625,
+   "label": "SUP",
+   "source": "vitaminc",
+   "claim": "Boney Kapoor announced the global total gross of Nerkonda Paarvai .",
+   "evidence": [
+    "The worldwide gross after 50 days of theatrical run as reported by Boney Kapoor was ."
+   ]
+  },
+  {
+   "rank": 37,
+   "idx": 427637,
+   "act": 0.3619,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Usher (musician) had a large advertising support budget.",
+   "evidence": [
+    "AnnArbor.com was an online newspaper that covered local news of Ann Arbor , Michigan and the surrounding Washtenaw County , Michigan ."
+   ]
+  },
+  {
+   "rank": 38,
+   "idx": 381569,
+   "act": 0.3619,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Economic Times's readership is inferior to that of the Providence Journal.",
+   "evidence": [
+    "A journal -LRB- through French from Latin diurnalis , daily -RRB- has several related meanings :"
+   ]
+  },
+  {
+   "rank": 39,
+   "idx": 589656,
+   "act": 0.3611,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "The Host stars a Slovenian actor.",
+   "evidence": [
+    "The following is a list of exoplanetary host stars ."
+   ]
+  },
+  {
+   "rank": 40,
+   "idx": 540457,
+   "act": 0.3598,
+   "label": "NEI",
+   "source": "fever",
+   "claim": "Anna Paquin moved to Georgia.",
+   "evidence": [
+    "Georgia has two principal meanings :"
+   ]
+  }
+ ]
+}

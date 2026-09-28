@@ -1,0 +1,15 @@
+{
+ "sae": "v1_domain",
+ "feat": 22280,
+ "n": 3335,
+ "n_nei": 317,
+ "n_dec": 3018,
+ "auc_feat_indomain": 0.800303257587796,
+ "auc_feat_averitec": 0.7637361948184709,
+ "auc_dir_indomain": 0.8377968960220351,
+ "auc_dir_averitec": 0.7766011711016759,
+ "nei_top200": 0.35,
+ "nei_base": 0.09505247376311844,
+ "nei_mean": 1.1042126417160034,
+ "dec_mean": 0.7211472392082214
+}

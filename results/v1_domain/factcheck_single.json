@@ -1,0 +1,248 @@
+{
+ "model": "llama3.1-8b-hf",
+ "preset": "v1_domain",
+ "layer": 15,
+ "evidence": "single",
+ "n": 500,
+ "betas": [
+  "-1.00",
+  "-0.50",
+  "-0.25",
+  "+0.00",
+  "+0.25",
+  "+0.50",
+  "+1.00"
+ ],
+ "gold_dist": {
+  "SUP": 122,
+  "REF": 305,
+  "NEI": 35,
+  "CONF": 38
+ },
+ "by_beta": {
+  "-1.00": {
+   "accuracy": 0.258,
+   "macro_f1": 0.114,
+   "nei_rate": 0.0,
+   "unparsed": 5,
+   "per_class": {
+    "SUP": {
+     "f1": 0.3927,
+     "precision": 0.2459,
+     "recall": 0.9754,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.0633,
+     "precision": 0.9091,
+     "recall": 0.0328,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "-0.50": {
+   "accuracy": 0.364,
+   "macro_f1": 0.2509,
+   "nei_rate": 0.164,
+   "unparsed": 5,
+   "per_class": {
+    "SUP": {
+     "f1": 0.4555,
+     "precision": 0.3097,
+     "recall": 0.8607,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.343,
+     "precision": 0.8784,
+     "recall": 0.2131,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.2051,
+     "precision": 0.1463,
+     "recall": 0.3429,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "-0.25": {
+   "accuracy": 0.388,
+   "macro_f1": 0.2983,
+   "nei_rate": 0.484,
+   "unparsed": 6,
+   "per_class": {
+    "SUP": {
+     "f1": 0.536,
+     "precision": 0.5234,
+     "recall": 0.5492,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.4766,
+     "precision": 0.8293,
+     "recall": 0.3344,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.1805,
+     "precision": 0.1033,
+     "recall": 0.7143,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+0.00": {
+   "accuracy": 0.272,
+   "macro_f1": 0.2234,
+   "nei_rate": 0.73,
+   "unparsed": 6,
+   "per_class": {
+    "SUP": {
+     "f1": 0.3506,
+     "precision": 0.8438,
+     "recall": 0.2213,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.393,
+     "precision": 0.8144,
+     "recall": 0.259,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.15,
+     "precision": 0.0822,
+     "recall": 0.8571,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+0.25": {
+   "accuracy": 0.168,
+   "macro_f1": 0.1053,
+   "nei_rate": 0.87,
+   "unparsed": 7,
+   "per_class": {
+    "SUP": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.281,
+     "precision": 0.8793,
+     "recall": 0.1672,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.1404,
+     "precision": 0.0759,
+     "recall": 0.9429,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+0.50": {
+   "accuracy": 0.078,
+   "macro_f1": 0.0454,
+   "nei_rate": 0.866,
+   "unparsed": 59,
+   "per_class": {
+    "SUP": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.0447,
+     "precision": 0.875,
+     "recall": 0.023,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.1368,
+     "precision": 0.0739,
+     "recall": 0.9143,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+1.00": {
+   "accuracy": 0.0,
+   "macro_f1": 0.0,
+   "nei_rate": 0.006,
+   "unparsed": 495,
+   "per_class": {
+    "SUP": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  }
+ }
+}

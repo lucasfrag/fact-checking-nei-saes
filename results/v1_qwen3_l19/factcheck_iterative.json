@@ -1,0 +1,248 @@
+{
+ "model": "qwen3-8b-hf",
+ "preset": "v1_qwen3_l19",
+ "layer": 19,
+ "evidence": "iterative",
+ "n": 500,
+ "betas": [
+  "-1.00",
+  "-0.50",
+  "-0.25",
+  "+0.00",
+  "+0.25",
+  "+0.50",
+  "+1.00"
+ ],
+ "gold_dist": {
+  "SUP": 122,
+  "REF": 305,
+  "NEI": 35,
+  "CONF": 38
+ },
+ "by_beta": {
+  "-1.00": {
+   "accuracy": 0.24,
+   "macro_f1": 0.0988,
+   "nei_rate": 0.0,
+   "unparsed": 14,
+   "per_class": {
+    "SUP": {
+     "f1": 0.3954,
+     "precision": 0.2474,
+     "recall": 0.9836,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "-0.50": {
+   "accuracy": 0.238,
+   "macro_f1": 0.098,
+   "nei_rate": 0.002,
+   "unparsed": 14,
+   "per_class": {
+    "SUP": {
+     "f1": 0.3921,
+     "precision": 0.2454,
+     "recall": 0.9754,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "-0.25": {
+   "accuracy": 0.382,
+   "macro_f1": 0.2267,
+   "nei_rate": 0.056,
+   "unparsed": 12,
+   "per_class": {
+    "SUP": {
+     "f1": 0.4644,
+     "precision": 0.3089,
+     "recall": 0.9344,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.3788,
+     "precision": 0.8242,
+     "recall": 0.2459,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0635,
+     "precision": 0.0714,
+     "recall": 0.0571,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+0.00": {
+   "accuracy": 0.406,
+   "macro_f1": 0.318,
+   "nei_rate": 0.502,
+   "unparsed": 13,
+   "per_class": {
+    "SUP": {
+     "f1": 0.599,
+     "precision": 0.7294,
+     "recall": 0.5082,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.5263,
+     "precision": 0.7947,
+     "recall": 0.3934,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.1469,
+     "precision": 0.0837,
+     "recall": 0.6,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+0.25": {
+   "accuracy": 0.368,
+   "macro_f1": 0.2957,
+   "nei_rate": 0.542,
+   "unparsed": 12,
+   "per_class": {
+    "SUP": {
+     "f1": 0.5673,
+     "precision": 0.686,
+     "recall": 0.4836,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.4782,
+     "precision": 0.8,
+     "recall": 0.341,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.1373,
+     "precision": 0.0775,
+     "recall": 0.6,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+0.50": {
+   "accuracy": 0.2,
+   "macro_f1": 0.1594,
+   "nei_rate": 0.062,
+   "unparsed": 191,
+   "per_class": {
+    "SUP": {
+     "f1": 0.3712,
+     "precision": 0.2803,
+     "recall": 0.5492,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.1754,
+     "precision": 0.8108,
+     "recall": 0.0984,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0909,
+     "precision": 0.0968,
+     "recall": 0.0857,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  },
+  "+1.00": {
+   "accuracy": 0.228,
+   "macro_f1": 0.0955,
+   "nei_rate": 0.004,
+   "unparsed": 21,
+   "per_class": {
+    "SUP": {
+     "f1": 0.3819,
+     "precision": 0.24,
+     "recall": 0.9344,
+     "support": 122
+    },
+    "REF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 305
+    },
+    "NEI": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 35
+    },
+    "CONF": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "support": 38
+    }
+   }
+  }
+ }
+}

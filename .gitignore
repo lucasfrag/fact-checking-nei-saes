@@ -1,0 +1,17 @@
+*.pdf
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.claude
+/activations/
+/checkpoints/
+/data_raw/
+/logs/
+*.partial
+*.tmp
+.ipynb_checkpoints/

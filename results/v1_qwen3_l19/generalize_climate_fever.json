@@ -1,0 +1,15 @@
+{
+ "sae": "v1_qwen3_l19",
+ "feat": 9998,
+ "test": "climate_fever",
+ "n": 1381,
+ "n_nei": 474,
+ "n_dec": 907,
+ "auc_feat_indomain": 0.0018828021729022841,
+ "auc_feat": 0.05389167236542783,
+ "auc_dir_indomain": 0.8321867424710584,
+ "auc_dir": 0.72435673779651,
+ "topk": 200,
+ "nei_top": 0.35,
+ "nei_base": 0.3432295438088342
+}

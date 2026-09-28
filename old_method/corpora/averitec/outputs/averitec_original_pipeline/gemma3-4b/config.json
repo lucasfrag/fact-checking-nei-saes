@@ -1,0 +1,26 @@
+{
+  "datasets": [
+    {
+      "name": "averitec_dev",
+      "path": "datasets/averitec/dev.json"
+    }
+  ],
+  "env": {
+    "OLLAMA_MODEL": "gemma3:4b",
+    "LLM_TEMPERATURE": "0.0",
+    "LANGUAGE": "en",
+    "SEARCH_ENGINE": "duckduckgo",
+    "SEARCH_MAX_RESULTS": "10",
+    "SEARCH_MAX_URLS": "30",
+    "SEARCH_MAX_WORKERS": "10",
+    "BM25_TOP_K": "10",
+    "USE_QUESTION_FOR_RETRIEVAL": "true",
+    "RERANKER_MODEL": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "RERANKER_TOP_K": "5",
+    "RERANKER_THRESHOLD": "0.3",
+    "USE_RERANKER": "true",
+    "CHUNK_SIZE": "300"
+  },
+  "git_commit": "809230a7df2159c073052852aaf163f163390943",
+  "created_at": "2026-04-22T13:59:03.956841"
+}

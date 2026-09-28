@@ -1,0 +1,15 @@
+{
+ "sae": "v1_domain",
+ "feat": 22280,
+ "test": "climate_fever",
+ "n": 1381,
+ "n_nei": 474,
+ "n_dec": 907,
+ "auc_feat_indomain": 0.800303257587796,
+ "auc_feat": 0.7468168348382714,
+ "auc_dir_indomain": 0.8377968960220351,
+ "auc_dir": 0.7681534618229523,
+ "topk": 200,
+ "nei_top": 0.705,
+ "nei_base": 0.3432295438088342
+}

@@ -1,0 +1,15 @@
+{
+ "sae": "v1_deepseek",
+ "feat": 1937,
+ "test": "averitec",
+ "n": 3335,
+ "n_nei": 317,
+ "n_dec": 3018,
+ "auc_feat_indomain": 0.6729728763882268,
+ "auc_feat": 0.6030076115337418,
+ "auc_dir_indomain": 0.7957779496324546,
+ "auc_dir": 0.6474935873716691,
+ "topk": 200,
+ "nei_top": 0.135,
+ "nei_base": 0.09505247376311844
+}

@@ -1,0 +1,15 @@
+{
+ "sae": "v1_domain",
+ "feat": 22280,
+ "test": "healthver",
+ "n": 6000,
+ "n_nei": 2548,
+ "n_dec": 3452,
+ "auc_feat_indomain": 0.800303257587796,
+ "auc_feat": 0.752934844496672,
+ "auc_dir_indomain": 0.8377968960220351,
+ "auc_dir": 0.7550814625698751,
+ "topk": 200,
+ "nei_top": 0.82,
+ "nei_base": 0.4246666666666667
+}

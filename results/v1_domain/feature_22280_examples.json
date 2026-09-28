@@ -1,0 +1,188 @@
+{
+ "feat": 22280,
+ "n_seen": 6000,
+ "nei_top200": 0.61,
+ "nei_all": 0.18733333333333332,
+ "top": [
+  {
+   "claim": "Carter Daniels ( a racist ) follows the people exiting the stadium but leaves his wife behind in The Final Destination .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.454
+  },
+  {
+   "claim": "The deepest point of Lake Superior is slightly the southeastern shore .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.439
+  },
+  {
+   "claim": "In the movie The Edge of Seventeen , he introduces the character Nadine .",
+   "label": "SUP",
+   "source": "vitaminc",
+   "act": 2.439
+  },
+  {
+   "claim": "Livingston , Montana , and Naganohara , Japan are sister cities .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.434
+  },
+  {
+   "claim": "Carreño is an actor .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.4
+  },
+  {
+   "claim": "Nathan Alexander Peno is G-Eazy 's cousin .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.395
+  },
+  {
+   "claim": "The reincarnation of the Varchas , son of the moon-god , was Abhimanyu .",
+   "label": "REF",
+   "source": "vitaminc",
+   "act": 2.269
+  },
+  {
+   "claim": "Niagara Falls had to create a legislative district in the Noth End of the city where its African-American people were in the majority .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.264
+  },
+  {
+   "claim": "The new CEO of Reliance Industries Limited is Pankaj Singh .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.26
+  },
+  {
+   "claim": "His parents are Norris Sr and Diane Cole",
+   "label": "SUP",
+   "source": "vitaminc",
+   "act": 2.237
+  },
+  {
+   "claim": "Nathan Alexander Peno is G-Eazy 's cousin .",
+   "label": "SUP",
+   "source": "vitaminc",
+   "act": 2.216
+  },
+  {
+   "claim": "Cry-Baby had a somewhat aggressive run-in with Allison 's boyfriend .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.213
+  },
+  {
+   "claim": "On Twitter , in November 2015 , he stated his resignation from the Labour party was due to being frustrated by the insults he got from Corbyn supporters , and his lack of confidence in his leadership .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.191
+  },
+  {
+   "claim": "The new CEO of Reliance Industries Limited is Pankaj Singh .",
+   "label": "SUP",
+   "source": "vitaminc",
+   "act": 2.173
+  },
+  {
+   "claim": "TD Ameritrade acquired Scottrade .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.158
+  },
+  {
+   "claim": "A site that had some of its material shown on Salon was closed in 2015 .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.142
+  },
+  {
+   "claim": "Harry Winks played outstandingly well against Luka Modric and Toni Kroos in the Real Madrid match .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.138
+  },
+  {
+   "claim": "Band member Noah was born in 1996 .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.132
+  },
+  {
+   "claim": "The Association for a Better New York activities are focused on the renewal and growth of the city .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.097
+  },
+  {
+   "claim": "Mary Kom is an Indian film .",
+   "label": "SUP",
+   "source": "vitaminc",
+   "act": 2.062
+  },
+  {
+   "claim": "Karl died in 1920 .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.058
+  },
+  {
+   "claim": "Jamie Conway is 24 years old .",
+   "label": "SUP",
+   "source": "vitaminc",
+   "act": 2.051
+  },
+  {
+   "claim": "In the film Begin Again , the character Adam regrets his actions .",
+   "label": "REF",
+   "source": "vitaminc",
+   "act": 2.044
+  },
+  {
+   "claim": "Ribeiro scored eight goals in the Serie A season .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.04
+  },
+  {
+   "claim": "Explanation for menopause can be classified as functional or nonfunctional .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.039
+  },
+  {
+   "claim": "It was a box office flop , with unflattering reviews .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.037
+  },
+  {
+   "claim": "Andy Kewzer is Nadia Monroy 's boyfriend , and he is a mechanic in The Final Destination .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.036
+  },
+  {
+   "claim": "Sammy killed himself .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.03
+  },
+  {
+   "claim": "The Royal Marines help Solo and Kuryakin .",
+   "label": "REF",
+   "source": "vitaminc",
+   "act": 2.026
+  },
+  {
+   "claim": "155 episodes of the series have been produced over four seasons .",
+   "label": "NEI",
+   "source": "vitaminc",
+   "act": 2.026
+  }
+ ]
+}

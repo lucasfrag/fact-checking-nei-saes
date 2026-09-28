@@ -1,0 +1,15 @@
+{
+ "sae": "v1_domain",
+ "feat": 22280,
+ "test": "scifact",
+ "n": 1261,
+ "n_nei": 304,
+ "n_dec": 957,
+ "auc_feat_indomain": 0.800303257587796,
+ "auc_feat": 0.8439957652752571,
+ "auc_dir_indomain": 0.8377968960220351,
+ "auc_dir": 0.6009665621734587,
+ "topk": 200,
+ "nei_top": 0.79,
+ "nei_base": 0.24107850911974624
+}

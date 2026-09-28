@@ -1,0 +1,41 @@
+{
+ "steps": 128794,
+ "fvu_heldout": 0.060683169929250484,
+ "fvu_decision": 0.012535998319829905,
+ "l0": 29.95664490666003,
+ "fvu_space": "normalized",
+ "dead_features": 2,
+ "config": {
+  "name": "v3_domain",
+  "model_tag": "llama3.1:8b",
+  "layer": 15,
+  "quant": "4bit",
+  "device": "cuda",
+  "datasets": [
+   "vitaminc",
+   "fever"
+  ],
+  "mix_general": false,
+  "general_dataset": "monology/pile-uncopyrighted",
+  "general_fraction": 0.25,
+  "max_per_dataset": 0,
+  "max_evidence": 4,
+  "max_seq_len": 512,
+  "shard_tokens": 500000,
+  "dtype_store": "float16",
+  "sae_width": 32768,
+  "sae_k": 32,
+  "sae_k_aux": 512,
+  "sae_dead_steps": 5000,
+  "sae_lr": 0.0001,
+  "sae_batch": 2048,
+  "sae_epochs": 2,
+  "sae_aux_coeff": 0.03125,
+  "sae_input_norm": true,
+  "sae_normalized_loss": true,
+  "sae_adam_eps": 6.25e-10,
+  "sae_grad_proj": true,
+  "sae_init_geomedian": true,
+  "sae_ema": 0.999
+ }
+}
