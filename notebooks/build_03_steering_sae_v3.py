@@ -211,6 +211,14 @@ coefficient)"* (e *"a random baseline where we apply a randomly sampled SAE late
 same coefficient"*), aplicado num conjunto de 100 perguntas. Turner et al. (2023, Apêndice G)
 fazem o análogo com vetores aleatórios *"with similar magnitudes to the steering vectors"*.
 
+**Como as 10 features são escolhidas.** Sorteio uniforme entre as 32.767 features do dicionário diferentes
+da 19219 (`numpy.random.default_rng(seed=0)`, em `fcsae/steering/factcheck_sae.py::directions`), o que as
+torna reproduzíveis: **27865, 26649, 20867, 16744, 8838, 1342, 541, 10085, 5742, 2465**. Não se sorteia do
+"top-k" porque o top-k é por token (as 32 features ativas em cada posição), não um conjunto fixo; o que o
+controle precisa é **outra direção do mesmo dicionário**, com o mesmo tamanho (linha do decoder normalizada ×
+o mesmo α). Nenhuma das 10 está entre as 15 features mais ligadas à abstenção (por Cohen's d ou cosseno com a
+direção de abstenção), e o SAE tem só 2 features mortas — então o controle não "compete" com a 19219 por acaso.
+
 ### 2.5 Métricas (as do SA)
 
 - **Rótulo de cada resposta:** o **1º rótulo que o modelo escreve** (métrica principal; §3.1) e,

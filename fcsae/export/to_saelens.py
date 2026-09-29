@@ -109,6 +109,9 @@ fact-checking verdict prompts, to study the model's **abstention** ("NOT ENOUGH 
 ## Abstention feature
 {feat_block}
 
+## Browse the latents
+Interactive viewer: [lucasfrag/fact-checking-abstention-saes-viewer](https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer).
+
 ## Usage
 ```python
 from sae_lens import SAE

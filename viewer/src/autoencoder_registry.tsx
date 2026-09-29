@@ -1,0 +1,48 @@
+import { Feature } from './types';
+
+// Domain SAEs trained on fact-checking verdict prompts (lucasfrag/fact-checking-abstention-saes).
+// To add a model: append it to MODELS (folder name in the dataset repo, layer, label).
+export const MODELS: {[key: string]: {layer: number, label: string, hf: string}} = {
+  'llama-3.1-8b-instruct': {layer: 15, label: 'Llama-3.1-8B-Instruct · layer 15', hf: 'meta-llama/Llama-3.1-8B-Instruct'},
+  // 'deepseek-r1-distill-llama-8b': {layer: 15, label: 'DeepSeek-R1-Distill-Llama-8B · layer 15', hf: 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B'},
+  // 'qwen3-8b': {layer: 19, label: 'Qwen3-8B · layer 19', hf: 'Qwen/Qwen3-8B'},
+};
+
+export const FC_FAMILY = {
+  subject: 'fact-checking',
+  name: 'fc_topk_32k',
+  label: 'TopK SAE, n=32768, k=32 (Gao et al., 2024), decision position of verdict prompts',
+  selectors: [
+    {key: 'model', label: 'Model', values: Object.keys(MODELS)},
+  ],
+  default_H: (H: {[key: string]: string}) => ({
+    model: H.model || Object.keys(MODELS)[0],
+  }),
+  get_ae: (H: {[key: string]: string}) => {
+    const model = H.model || Object.keys(MODELS)[0];
+    return {
+      subject: 'fact-checking',
+      family: 'fc_topk_32k',
+      H: {model},
+      path: `${model}/layer-${MODELS[model].layer}`,
+      num_features: 32768,
+    }
+  },
+}
+
+export const DEFAULT_AUTOENCODER = FC_FAMILY.get_ae(FC_FAMILY.default_H({}));
+
+export const AUTOENCODER_FAMILIES = Object.fromEntries(
+  [FC_FAMILY].map((family) => [family.name, family])
+);
+
+export const SUBJECT_MODELS = ['fact-checking'];
+
+export function pathForFeature(feature: Feature) {
+  let res = `/model/${feature.autoencoder.subject}/family/${feature.autoencoder.family}`;
+  for (const selector of AUTOENCODER_FAMILIES[feature.autoencoder.family].selectors) {
+    res += `/${selector.key}/${feature.autoencoder.H[selector.key]}`;
+  }
+  res += `/feature/${feature.atom}`;
+  return res
+}
