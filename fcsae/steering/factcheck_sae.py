@@ -35,12 +35,13 @@ import numpy as np
 import torch
 from safetensors.torch import load_file
 
-from fcsae.config import preset, ROOT
+from fcsae.config import preset, Config, ROOT
 from fcsae.common.modeling import load_model
 
 OUT = os.path.join(ROOT, "old_method/corpora/averitec/outputs")
 EV_DIR = {"single": "averitec_original_pipeline", "iterative": "averitec_iterative_pipeline"}
-HF_TAG = {"llama3.1:8b": "llama3.1-8b-hf", "deepseek-r1:8b": "deepseek-r1-8b-hf", "qwen3:8b": "qwen3-8b-hf"}
+HF_TAG = {"llama3.1:8b": "llama3.1-8b-hf", "deepseek-r1:8b": "deepseek-r1-8b-hf", "qwen3:8b": "qwen3-8b-hf",
+          "gemma3:4b": "gemma3-4b-hf", "gemma4:e4b": "gemma4-e4b-hf"}
 MAX_NEW_TOKENS = 1536        # = HF_MAX_NEW_TOKENS do pipeline; a normalização lê o texto inteiro ("FALSE" em qualquer ponto -> REF)
 
 # ---------------------------------------------------------------- pipeline original (cópia fiel)
@@ -135,19 +136,29 @@ def normalize(response):
 _LABEL_RE = __import__("re").compile(r"NOT ENOUGH EVIDENCE|CONFLICTING EVIDENCE|SUPPORTED|REFUTED")
 _LABEL_MAP = {"NOT ENOUGH EVIDENCE": "NEI", "CONFLICTING EVIDENCE": "CONF", "SUPPORTED": "SUP", "REFUTED": "REF"}
 
+# Enumeração das OPÇÕES (2+ rótulos seguidos, separados por vírgula / "or" / "and" / "/"), p.ex. "I cannot
+# determine whether the claim is SUPPORTED, REFUTED, NOT ENOUGH EVIDENCE, or CONFLICTING EVIDENCE/CHERRYPICKING":
+# o modelo está citando o formato da resposta, não dando veredito -> ignorada (achado em 28/09/2026, nb03 §3.1.1).
+_L = r"(?:NOT ENOUGH EVIDENCE|CONFLICTING EVIDENCE(?:/CHERRYPICKING)?|SUPPORTED|REFUTED)"
+_ENUM_RE = __import__("re").compile(rf"{_L}(?:(?:\s*,\s*(?:or\s+|and\s+)?|\s+or\s+|\s+and\s+|\s*/\s*){_L})+")
+
+
+def _verdict_text(response):
+    return _ENUM_RE.sub(" ", response or "")
+
 
 def first_label(response):
-    """Rótulo que o modelo PRODUZIU: o primeiro rótulo escrito como rótulo (maiúsculas, por extenso).
-    Se a resposta começa com o rótulo, é esse; se raciocina antes, é o primeiro que aparece; sem
-    rótulo -> NEI (padrão do pipeline). Corrige o defeito de `normalize` (pipeline original), que
-    procura "REFUTE"/"FALSE" em qualquer ponto ANTES de "NOT ENOUGH" (achado em 28/09/2026)."""
-    m = _LABEL_RE.search(response or "")
+    """Rótulo que o modelo PRODUZIU: o primeiro rótulo escrito como rótulo (maiúsculas, por extenso),
+    fora de enumerações das opções (`_ENUM_RE`). Se a resposta começa com o rótulo, é esse; se raciocina
+    antes, é o primeiro que aparece; sem rótulo -> NEI (padrão do pipeline). Corrige o defeito de
+    `normalize` (pipeline original), que procura "REFUTE"/"FALSE" em qualquer ponto ANTES de "NOT ENOUGH"."""
+    m = _LABEL_RE.search(_verdict_text(response))
     return _LABEL_MAP[m.group(0)] if m else "NEI"
 
 
 def readable(response):
-    """Saída contém algum dos 4 rótulos ESCRITO COMO RÓTULO (maiúsculas, por extenso)."""
-    return bool(_LABEL_RE.search(response or ""))
+    """Saída contém algum dos 4 rótulos ESCRITO COMO RÓTULO (maiúsculas, por extenso), fora de enumerações."""
+    return bool(_LABEL_RE.search(_verdict_text(response)))
 
 
 # Recusa por FALTA DE INFORMAÇÃO/EVIDÊNCIA escrita por extenso, sem usar o rótulo — detectada por
@@ -260,7 +271,13 @@ def residual_norm(cfg):
 
 @torch.no_grad()
 def run(args):
-    cfg = preset(args.preset); dev = cfg.device
+    # --replay <tag>: só o baseline (α = 0) do veredito de um modelo do pipeline HF, sem SAE e sem hook —
+    # re-gera as respostas para reler o rótulo com `first_label` (defeito do `normalize`, nb01 §7)
+    replay = args.replay
+    cfg = Config(name=f"replay_{HF_TAG[replay]}", model_tag=replay) if replay else preset(args.preset)
+    dev = cfg.device
+    if replay:
+        args.betas, args.conds, args.random = "0", "single,iterative", 0
     claims = load_claims(cfg.model_tag)
     # metades fixas do AVeriTeC dev: validação = claim_id par, teste = claim_id ímpar
     # [seleção do coeficiente em validação: Arditi et al. 2024; Ferrando et al. 2025]
@@ -271,18 +288,20 @@ def run(args):
     if args.n:
         claims = claims[:args.n]
     tag = "" if (args.split == "all" and not args.n) else f"__{args.split}{args.n or len(claims)}"
-    R = residual_norm(cfg)
-    dirs = directions(cfg, args.feat, args.random)
+    R = None if replay else residual_norm(cfg)
+    dirs = {"none": None} if replay else directions(cfg, args.feat, args.random)
     if args.random:                      # só as aleatórias (a feature roda sem --random)
         dirs = {k: v for k, v in dirs.items() if k.startswith("rand")}
     betas = [float(b) for b in args.betas.split(",")]
     conds = args.conds.split(",")
-    out_dir = os.path.join(ROOT, "results", cfg.name, "steer_sae"); os.makedirs(out_dir, exist_ok=True)
-    print(f"[{cfg.name}] camada {cfg.layer} | R={R:.3f} | claims={len(claims)} | direções={list(dirs)[:4]}{'...' if len(dirs) > 4 else ''} "
+    out_dir = (os.path.join(ROOT, "results", "replay", HF_TAG[replay]) if replay
+               else os.path.join(ROOT, "results", cfg.name, "steer_sae")); os.makedirs(out_dir, exist_ok=True)
+    print(f"[{cfg.name}] camada {cfg.layer} | R={R if R is None else round(R, 3)} | claims={len(claims)} | direções={list(dirs)[:4]}{'...' if len(dirs) > 4 else ''} "
           f"| β={betas} | condições={conds}", flush=True)
 
     model, tok = load_model(cfg.checkpoint, cfg.quant, dev)
-    model.model.layers[cfg.layer].register_forward_hook(make_hook())
+    if not replay:
+        model.model.layers[cfg.layer].register_forward_hook(make_hook())
 
     def generate(prompt):
         inputs = tok.apply_chat_template([{"role": "system", "content": SYSTEM_PROMPT},
@@ -335,7 +354,9 @@ def run(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", default="v3_llama")
-    ap.add_argument("--feat", type=int, required=True)
+    ap.add_argument("--feat", type=int, default=None)
+    ap.add_argument("--replay", default=None, choices=sorted(HF_TAG),
+                    help="só o baseline (α=0) do veredito deste modelo do pipeline HF, sem SAE")
     ap.add_argument("--betas", default="0")
     ap.add_argument("--conds", default="none,single,iterative")
     ap.add_argument("--random", type=int, default=0, help="nº de features aleatórias (controle)")
@@ -345,6 +366,8 @@ def main():
     ap.add_argument("--max-new-tokens", type=int, default=MAX_NEW_TOKENS)
     ap.add_argument("--check", action="store_true", help="só β=0 nas condições single/iterative")
     args = ap.parse_args()
+    if args.feat is None and not args.replay:
+        ap.error("--feat é obrigatório (exceto com --replay)")
     if args.check:
         args.betas, args.conds = "0", "single,iterative"
     run(args)

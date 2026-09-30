@@ -163,3 +163,13 @@ export const DEFAULT_BOUNDARIES = [
   -1, 0, 1
 ]
 
+
+// Steering panel (viewer/<model>/layer-<L>/steering/<atom>.json, from fcsae.analysis.viewer_steering)
+export type SteeringPoint = {alpha_over_R: number, acc: number, macro_f1: number, f1_nei: number, f1_conf: number,
+                             nei_rate: number, err_non_nei: number | null, coherent: number, hit_cap?: number}
+export type SteeringExample = {kind: string, alpha_over_R_selected: number, claim_id: number, claim: string, gold: string,
+                               evidence: {text: string, url?: string}[],
+                               responses: {alpha_over_R: number, pred: string, text: string}[]}
+export type SteeringInfo = {feature: number, model: string, layer: number, R: number, n_claims: number, dataset: string,
+                            conditions: {[cond: string]: string}, curves: {[cond: string]: SteeringPoint[]},
+                            examples: {[cond: string]: SteeringExample[]}}

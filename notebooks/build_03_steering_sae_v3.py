@@ -198,7 +198,39 @@ conhecimento da recusa *"due to safety concerns"*.
 3. na regra de rótulo do pipeline essas respostas já viravam NEI, então as métricas (acurácia,
    F1, NEI) **não mudam** — muda só qual α é considerado "sem quebrar o modelo".
 
+#### 2.3.2 Três regras de escolha do α, lado a lado (29/09/2026, com a grade completa)
+
+**Por que revisitar.** Com a grade completa, a regra da §2.3 (maior |α| com ≥ 80% de respostas
+coerentes) escolhe **α/R = −1** do lado "diminuir" nas três condições — justamente a dose em que o
+modelo **degrada**: diz SUPPORTED para quase tudo e ~20% das respostas entram em *loop* até o limite
+de 1.536 tokens. Isso acontece porque, em geral, o modelo escreve o rótulo **antes** de entrar em
+loop, e o critério "coerente" só verifica se há rótulo (ou recusa). A conclusão do §5.0 passa a
+**depender da regra**, então reportamos **as três** (decisão do Lucas, 29/09/2026: *"no nb03 eu quero
+ver tudo"*):
+
+| regra | escolhe, na **validação** (`claim_id` par)… | o que prioriza |
+|---|---|---|
+| **A** (a da §2.3) | o maior \|α\| com ≥ 80% de respostas **coerentes** | o **maior efeito** ainda com rótulo |
+| **B** | o maior \|α\| com ≥ 80% de respostas coerentes **e sem loop** | o maior efeito **sem degeneração** |
+| **C** | entre as doses que passam na B, a de **maior acurácia** | o **melhor desempenho** sem degeneração |
+
+- **Loop** = a resposta chega ao limite de geração (≥ 1.530 dos 1.536 tokens, contados com o
+  tokenizador do modelo) — o modelo não termina a resposta. É a degradação do texto que o CAA usa
+  para limitar o multiplicador (Panickssery et al., 2024).
+- **C** é a escolha padrão de hiperparâmetro: otimiza a métrica-alvo **na validação** e reporta no
+  **teste**, que continua intocado. É também o protocolo de Ferrando et al. (2025, nota 5: *"We use a
+  validation set to select an appropriate steering coefficient α"*) e de Arditi et al. (2024, §2.3:
+  *"by evaluating each candidate vector over validation sets"*).
+- **A** e **B** respondem melhor à pergunta **causal** ("quanto a feature controla a abstenção?"); **C**
+  responde à pergunta **prática** ("manipular a feature melhora o fact-checking?"). As curvas
+  completas (§5.1) cobrem todas as doses, independentemente da regra.
+- A regra que vai para a dissertação ainda **não foi escolhida**; a §5.3 mostra, para cada dose, os
+  números de validação que cada regra usa.
+
 ### 2.4 Controle com features aleatórias
+
+**Status (29/09/2026): adiado** — decisão do Lucas: *"No final eu vejo se vale a pena ou não
+fazermos"*. O desenho abaixo fica registrado para quando (e se) for rodado.
 
 Nos dois α escolhidos (diminuir e aumentar), repetimos o steering trocando $d_{19219}$ pela
 direção de **10 features aleatórias do mesmo SAE** (mesmo α, mesma camada), nas três condições,
@@ -324,7 +356,8 @@ da §4.2.)
 1. se a resposta **começa com um rótulo**, usa esse rótulo e ignora o resto — é o caso de quase todas
    as respostas **com evidência** (98–100% por célula; 81% em α/R = +0,5);
 2. se **não começa** (sem evidência o modelo às vezes raciocina antes: *"To determine the final
-   verdict… the claim is REFUTED"*), usa o **primeiro rótulo que aparece** no texto;
+   verdict… the claim is REFUTED"*), usa o **primeiro rótulo que aparece** no texto — **fora de
+   enumerações das opções** (§3.1.1);
 3. se **não há rótulo nenhum** (p.ex. as recusas por extenso *"I'm unable to find any information…"*),
    conta como **NEI** — o mesmo padrão do pipeline, e semanticamente correto (são abstenções).
 
@@ -335,6 +368,34 @@ células guardam o texto completo das respostas, **nada precisou ser re-rodado**
 
 **Consequência para a RQ1:** os números dos pipelines no notebook 01 foram calculados com essa
 regra — ver a seção sobre o defeito no `01-single-vs-iterative-it.ipynb`.
+""")
+
+md(r"""#### 3.1.1 Segunda correção da leitura: enumerações das opções (28/09/2026)
+
+**O que era.** Ao inspecionar os exemplos no SAE viewer, apareceu uma resposta lida como **SUP** que é,
+na verdade, uma **recusa**:
+
+> *"To determine the final verdict of the claim, I need more information about the evidence.
+> Unfortunately, the provided evidence is empty. […] Without the evidence, I cannot accurately determine
+> whether the claim is **SUPPORTED, REFUTED, NOT ENOUGH EVIDENCE, or CONFLICTING EVIDENCE/CHERRYPICKING**."*
+
+O modelo não dá veredito: ele **cita as opções** do formato de resposta. Como a leitura do passo 2 pega
+o **primeiro** rótulo em maiúsculas, pegava o "SUPPORTED" da lista.
+
+**Correção.** Uma sequência de **dois ou mais rótulos seguidos**, separados só por vírgula, *"or"*,
+*"and"* ou *"/"*, é tratada como **enumeração das opções** e ignorada (`_ENUM_RE` em
+`fcsae/steering/factcheck_sae.py`); o rótulo é o primeiro que sobra, e se não sobra nenhum a resposta é
+NEI (passo 3). A mesma exclusão vale para o critério "coerente" (§2.3.1), que exige um rótulo **ou** uma
+recusa por falta de informação.
+
+**Tamanho (tabela da §4.1.1):** atinge **no máximo 8 de 500 respostas** numa célula (1,6%; sem evidência,
+α/R = +0,25), quase só nas **doses positivas**, onde o modelo recusa por extenso e lista as opções. As
+células que sustentam os resultados (baselines α = 0 e Single α/R −0,5 / −0,75) mudam **0 ou 1** resposta;
+nenhuma conclusão muda. A coerência muda em no máximo 2 respostas, longe do limite de 80%.
+
+**Por que é o mesmo tipo de erro da §3.1:** nos dois casos a regra lia um rótulo que o modelo **mencionou**
+em vez do que ele **decidiu**. Como a leitura é feita sobre o texto salvo, a correção **não exigiu re-rodar**
+nenhuma célula.
 """)
 
 md(r"""## 4. Carregamento e métricas""")
@@ -349,6 +410,8 @@ CLS = ["SUP", "REF", "NEI", "CONF"]
 COND = {"none": "sem evidência", "single": "Single-step", "iterative": "Iterative"}
 THR = 0.80                                  # coerência mínima (§2.3)
 from fcsae.steering.factcheck_sae import coherent, readable as has_label, first_label, REFUSAL_PATTERNS
+from transformers import AutoTokenizer
+_tok = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")   # conta tokens p/ detectar loop (§2.3.2)
 
 def f1(pred, gold, c):
     tp = sum(p == c and g == c for p, g in zip(pred, gold)); fp = sum(p == c and g != c for p, g in zip(pred, gold))
@@ -374,6 +437,7 @@ for p in sorted(glob.glob(f"{D}/*.json")):
     r["pred_pipeline"] = r["pred"]                             # regra do pipeline (normalize)
     r["pred"] = [first_label(x) for x in r["raw"]]             # MÉTRICA PRINCIPAL: 1º rótulo (§3.1)
     r["readable"] = [coherent(x) for x in r["raw"]]           # critério principal: coerente
+    r["capped"] = [len(_tok(x, add_special_tokens=False).input_ids) >= r["max_new_tokens"] - 6 for x in r["raw"]]  # loop (§2.3.2)
     cells.append(r)
 print(f"células prontas: {len(cells)}")
 for r in cells:
@@ -396,6 +460,28 @@ for r in cells:
 pd.DataFrame(rows, columns=["condição", "concordância", "acc (nosso α=0, regra pipeline)", "acc (pipeline)", "NEI (nosso α=0, regra pipeline)",
                             "NEI (pipeline)", "acc (1º rótulo)", "NEI (1º rótulo)"]).round(3) \
   if rows else "ainda não há células de α=0 com evidência (1.536 tokens)"
+""")
+
+md(r"""#### 4.1.1 Impacto da correção das enumerações (§3.1.1)
+
+**Como ler.** Uma linha por célula (500 claims) com pelo menos uma resposta afetada. **mudam** = respostas
+cujo rótulo muda entre a leitura sem a exclusão das enumerações (versão anterior) e a leitura atual;
+ao lado, acurácia e taxa de NEI com cada uma. Células ausentes da tabela não mudam nada.""")
+
+code(r"""_LAB = re.compile(r"NOT ENOUGH EVIDENCE|CONFLICTING EVIDENCE|SUPPORTED|REFUTED")
+_MAP = {"NOT ENOUGH EVIDENCE": "NEI", "CONFLICTING EVIDENCE": "CONF", "SUPPORTED": "SUP", "REFUTED": "REF"}
+def first_label_sem_enum(t):          # versão anterior (sem excluir enumerações), só para comparação
+    m = _LAB.search(t or ""); return _MAP[m.group(0)] if m else "NEI"
+
+rows = []
+for r in sorted([c for c in cells if not c["subset"]], key=lambda r: (list(COND).index(r["cond"]), r["beta"])):
+    old = [first_label_sem_enum(x) for x in r["raw"]]
+    n_ch = sum(a != b for a, b in zip(old, r["pred"]))
+    if n_ch:
+        mo, mn = metrics(old, r["gold"], r["readable"]), metrics(r["pred"], r["gold"], r["readable"])
+        rows.append([COND[r["cond"]], r["beta"], n_ch, mo["acc"], mn["acc"], mo["nei_rate"], mn["nei_rate"],
+                     dict(collections.Counter(f"{a}→{b}" for a, b in zip(old, r["pred"]) if a != b))])
+pd.DataFrame(rows, columns=["condição", "α/R", "mudam", "acc (antes)", "acc (atual)", "NEI (antes)", "NEI (atual)", "mudanças"]).round(3)
 """)
 
 md(r"""### 4.2 Como o modelo responde — tipos de resposta, contagens e exemplos
@@ -494,7 +580,7 @@ md(r"""## 5. Resultados
   (`01-single-vs-iterative-it.ipynb`), só como referência;
 - para cada condição de evidência (**sem evidência**, **Single-step**, **Iterative**): o nosso
   veredito **sem steering** (α = 0) e com a feature 19219 **diminuída** (menos NEI) e
-  **aumentada** (mais NEI), no α escolhido na validação (§2.3).
+  **aumentada** (mais NEI), no α escolhido na validação por **cada uma das três regras** (§2.3.2).
 
 **Como o veredito é decidido.** Cada manipulação é comparada com o α = 0 **da mesma condição**
 (mesmo prompt, mesma evidência; só muda o steering):
@@ -521,48 +607,68 @@ def test_half(r, key="pred"):
 
 cells500 = [r for r in cells if not r["subset"] and (r["direction"] == "none" or r["direction"].startswith("feat"))]
 def cell(cond, b): return next((r for r in cells500 if r["cond"] == cond and r["beta"] == b), None)
-def pick(cond, sign):   # maior |α| com coerência >= THR na VALIDAÇÃO (id par)
-    ok = []
-    for r in cells500:
-        if r["cond"] == cond and np.sign(r["beta"]) == sign:
-            val = [r["readable"][i] for i, cid in enumerate(r["ids"]) if cid % 2 == 0]
-            if np.mean(val) >= THR: ok.append(r["beta"])
-    return max(ok, key=abs) if ok else None
+RULES = {"A": "maior |α| coerente", "B": "maior |α| coerente e sem loop", "C": "melhor acurácia (coerente e sem loop)"}
+def val_idx(r): return [i for i, cid in enumerate(r["ids"]) if cid % 2 == 0]
+def val_stats(r):
+    V = val_idx(r)
+    return {"coerente": np.mean([r["readable"][i] for i in V]),
+            "coerente_sem_loop": np.mean([r["readable"][i] and not r["capped"][i] for i in V]),
+            "acc": np.mean([r["pred"][i] == r["gold"][i] for i in V])}
+def pick(cond, sign, rule="A"):   # escolha do α na VALIDAÇÃO (id par) — §2.3 e §2.3.2
+    cand = {r["beta"]: val_stats(r) for r in cells500 if r["cond"] == cond and np.sign(r["beta"]) == sign}
+    key = "coerente" if rule == "A" else "coerente_sem_loop"
+    ok = [b for b, v in cand.items() if v[key] >= THR]
+    if not ok: return None
+    if rule == "C":
+        return max(ok, key=lambda b: (cand[b]["acc"], -abs(b)))   # empate -> menor dose
+    return max(ok, key=abs)
 
 COLS = ["acc", "macroF1", "F1_SUP", "F1_REF", "F1_NEI", "F1_CONF", "nei_rate", "err_nonNEI", "legivel"]
-rows, lines = [], []
+rows, lines, comp = [], {k: [] for k in RULES}, []
 for cond in ["single", "iterative"]:            # referência: pipelines originais
     r0 = cell(cond, 0.0)
     if r0:
         p, g, rd = test_half(r0, "pipeline_pred"); m = metrics(p, g, rd)
-        rows.append([f"Pipeline {COND[cond]} (nb 01, regra original)", "—", "—"] + [m[k] for k in COLS] + ["referência", np.nan])
+        rows.append([f"Pipeline {COND[cond]} (nb 01, regra original)", "—", "—", "—"] + [m[k] for k in COLS] + ["referência", np.nan])
 for cond in COND:
     r0 = cell(cond, 0.0)
     if not r0: continue
     p0, g, rd0 = test_half(r0); m0 = metrics(p0, g, rd0)
-    rows.append([COND[cond], "sem steering", 0.0] + [m0[k] for k in COLS] + ["baseline", np.nan])
+    rows.append([COND[cond], "sem steering", "—", 0.0] + [m0[k] for k in COLS] + ["baseline", np.nan])
     for sense, sign in [("diminuir NEI", -1), ("aumentar NEI", 1)]:
-        b = pick(cond, sign)
-        if b is None:
-            lines.append(f"- **{COND[cond]} + {sense}:** ainda sem células suficientes."); continue
-        p1, _, rd1 = test_half(cell(cond, b)); m1 = metrics(p1, g, rd1); pv = mcnemar_p(p1, p0, g)
-        d = m1["acc"] - m0["acc"]
-        verdict = ("▲ MELHOROU" if d > 0 else "▼ PIOROU") if pv < 0.05 else "= sem diferença significativa"
-        rows.append([COND[cond], sense, b] + [m1[k] for k in COLS] + [verdict, pv])
-        lines.append(f"- **{COND[cond]} + {sense} (α = {b*8.375:+.2f}; α/R = {b:+.2f}): {verdict}** — acurácia {m0['acc']:.3f} → {m1['acc']:.3f} "
-                     f"({100*d:+.1f} pts, p = {pv:.3g}). Taxa de NEI {m0['nei_rate']:.3f} → {m1['nei_rate']:.3f}; "
-                     f"F1 NEI {m0['F1_NEI']:.3f} → {m1['F1_NEI']:.3f}; erro fora de NEI {m0['err_nonNEI']:.3f} → {m1['err_nonNEI']:.3f}; "
-                     f"coerente {m1['legivel']:.0%}.")
-display(Markdown("#### Veredito por manipulação (metade de teste, 250 claims)\n\n" + ("\n".join(lines) if lines else "_ainda sem células de steering_")))
-S = pd.DataFrame(rows, columns=["condição", "manipulação", "α/R", "Acc", "F1", "F1 SUP", "F1 REF", "F1 NEI", "F1 CONF",
+        for rule in RULES:
+            b = pick(cond, sign, rule)
+            if b is None:
+                lines[rule].append(f"- **{COND[cond]} + {sense}:** nenhuma dose passa no critério."); continue
+            r1 = cell(cond, b); p1, _, rd1 = test_half(r1); m1 = metrics(p1, g, rd1); pv = mcnemar_p(p1, p0, g)
+            loops = np.mean([r1["capped"][i] for i, cid in enumerate(r1["ids"]) if cid % 2 == 1])
+            d = m1["acc"] - m0["acc"]
+            verdict = ("▲ MELHOROU" if d > 0 else "▼ PIOROU") if pv < 0.05 else "= sem diferença significativa"
+            rows.append([COND[cond], sense, rule, b] + [m1[k] for k in COLS] + [verdict, pv])
+            comp.append([COND[cond], sense, rule, b, f"{m0['acc']:.3f} → {m1['acc']:.3f}", pv, verdict,
+                         f"{m0['err_nonNEI']:.3f} → {m1['err_nonNEI']:.3f}", loops])
+            lines[rule].append(f"- **{COND[cond]} + {sense} (α = {b*8.375:+.2f}; α/R = {b:+.2f}): {verdict}** — acurácia {m0['acc']:.3f} → {m1['acc']:.3f} "
+                               f"({100*d:+.1f} pts, p = {pv:.3g}). Taxa de NEI {m0['nei_rate']:.3f} → {m1['nei_rate']:.3f}; "
+                               f"F1 NEI {m0['F1_NEI']:.3f} → {m1['F1_NEI']:.3f}; erro fora de NEI {m0['err_nonNEI']:.3f} → {m1['err_nonNEI']:.3f}; "
+                               f"coerente {m1['legivel']:.0%}; em loop {loops:.0%}.")
+for rule, desc in RULES.items():
+    display(Markdown(f"#### Regra {rule} — {desc} (metade de teste, 250 claims)\n\n" + "\n".join(lines[rule])))
+display(Markdown("#### As três regras lado a lado"))
+display(pd.DataFrame(comp, columns=["condição", "manipulação", "regra", "α/R", "acurácia (α=0 → α)", "p (McNemar)", "veredito",
+                                    "erro fora de NEI (α=0 → α)", "em loop"]).set_index(["condição", "manipulação", "regra"]).round(3))
+display(Markdown("#### Todas as métricas"))
+S = pd.DataFrame(rows, columns=["condição", "manipulação", "regra", "α/R", "Acc", "F1", "F1 SUP", "F1 REF", "F1 NEI", "F1 CONF",
                                 "NEI", "erro não-NEI", "coerente", "veredito", "p (McNemar)"])
-S.set_index(["condição", "manipulação"]).round(3)""")
+S.set_index(["condição", "manipulação", "regra"]).round(3)""")
 
 md(r"""👉 **Como interpretar.**
 - **"Diminuir NEI" que melhora a acurácia** com evidência é o resultado esperado pela H3: o
   modelo super-abstém (gold tem 7% de NEI), então reduzir a abstenção converte NEIs errados em
   decisões certas. O **erro fora de NEI** diz se o preço foi decidir errado mais vezes —
-  o critério do SA é que ele **não piore mais do que a iteração já piora** (+0,004 no Llama HF).
+  o critério do SA é que ele **não piore mais do que a iteração já piora**. Com a regra de rótulo
+  original do pipeline, a iteração piora esse erro em só +0,004 no Llama HF (nb 01); com a **leitura
+  correta** (1º rótulo, §3.1), nos 500 claims, o Single tem 0,195 e o Iterative 0,257 — a iteração
+  piora em **+0,062**. Essa é a referência a usar.
 - **"Aumentar NEI"** deve **piorar** a acurácia (mais abstenção num conjunto quase sem NEI) —
   é o teste causal da H1 no outro sentido, não uma tentativa de melhorar.
 - **Sem evidência**, "diminuir NEI" mostra quanto o modelo consegue decidir **só com o
@@ -615,26 +721,40 @@ pd.DataFrame(rows, columns=["condição", "α/R", "Acc", "F1", "F1 SUP", "F1 REF
 
 md(r"""### 5.3 α escolhido na validação e resultado na metade de teste
 
-**Como ler.** Para cada condição e sentido, o α escolhido pelo critério da §2.3 (maior |α| com
-coerência ≥ 80% na validação, `claim_id` par) e as métricas na metade de **teste**
-(`claim_id` ímpar) contra o α = 0 na mesma metade.""")
+**Como ler.** A 1ª tabela mostra, para **cada dose**, os números da **validação** (`claim_id` par) que as
+regras da §2.3.2 usam — coerência, coerência sem loop e acurácia — e qual regra escolhe aquela dose.
+A 2ª tabela, as métricas na metade de **teste** (`claim_id` ímpar) do α escolhido por cada regra,
+contra o α = 0 na mesma metade.""")
 
 code(r"""def half(r, parity):
     idx = [i for i, cid in enumerate(r["ids"]) if cid % 2 == parity]
     return [r["pred"][i] for i in idx], [r["gold"][i] for i in idx], [r["readable"][i] for i in idx]
+
+vrows = []
+for cond in COND:
+    picks = {(sign, rule): pick(cond, sign, rule) for sign in (-1, 1) for rule in RULES}
+    for r in sorted([r for r in cells500 if r["cond"] == cond and r["beta"] != 0], key=lambda r: r["beta"]):
+        v = val_stats(r); sign = int(np.sign(r["beta"]))
+        vrows.append([COND[cond], r["beta"], v["coerente"], v["coerente_sem_loop"], v["acc"],
+                      " ".join(rule for rule in RULES if picks[(sign, rule)] == r["beta"])])
+display(Markdown("#### Validação: o que cada regra vê em cada dose"))
+display(pd.DataFrame(vrows, columns=["condição", "α/R", "coerente", "coerente e sem loop", "acurácia", "escolhida pela regra"])
+          .set_index(["condição", "α/R"]).round(3))
 
 rows, chosen = [], {}
 for cond in COND:
     rs = {r["beta"]: r for r in feat if r["cond"] == cond}
     if 0.0 not in rs: continue
     base = metrics(*half(rs[0.0], 1))
-    rows.append([COND[cond], "baseline", 0.0] + [base[k] for k in ("acc", "macroF1", "F1_NEI", "F1_CONF", "nei_rate", "err_nonNEI", "legivel")])
+    rows.append([COND[cond], "baseline", "—", 0.0] + [base[k] for k in ("acc", "macroF1", "F1_NEI", "F1_CONF", "nei_rate", "err_nonNEI", "legivel")])
     for sense, sign in [("diminuir", -1), ("aumentar", 1)]:
-        ok = [b for b, r in rs.items() if np.sign(b) == sign and np.mean(half(r, 0)[2]) >= THR]
-        if not ok: continue
-        b = max(ok, key=abs); chosen[(cond, sense)] = b; m = metrics(*half(rs[b], 1))
-        rows.append([COND[cond], sense, b] + [m[k] for k in ("acc", "macroF1", "F1_NEI", "F1_CONF", "nei_rate", "err_nonNEI", "legivel")])
-T = pd.DataFrame(rows, columns=["condição", "manipulação", "α/R", "Acc", "F1", "F1 NEI", "F1 CONF", "NEI", "erro não-NEI", "coerente"])
+        for rule in RULES:
+            b = pick(cond, sign, rule)
+            if b is None: continue
+            chosen[(cond, sense, rule)] = b; m = metrics(*half(rs[b], 1))
+            rows.append([COND[cond], sense, rule, b] + [m[k] for k in ("acc", "macroF1", "F1_NEI", "F1_CONF", "nei_rate", "err_nonNEI", "legivel")])
+display(Markdown("#### Teste: métricas do α escolhido por cada regra"))
+T = pd.DataFrame(rows, columns=["condição", "manipulação", "regra", "α/R", "Acc", "F1", "F1 NEI", "F1 CONF", "NEI", "erro não-NEI", "coerente"])
 alt = {}
 for cond in COND:
     rs = {r["beta"]: r for r in feat if r["cond"] == cond}
@@ -642,9 +762,8 @@ for cond in COND:
         ok = [b for b, r in rs.items() if np.sign(b) == sign and
               np.mean([r["label_ok"][i] for i, cid in enumerate(r["ids"]) if cid % 2 == 0]) >= THR]
         if ok: alt[(cond, sense)] = max(ok, key=abs)
-print("α/R escolhidos (validação) — critério COERENTE (principal):", chosen if chosen else "ainda sem células suficientes")
-print("α/R que o critério original (COM RÓTULO) escolheria:      ", alt if alt else "ainda sem células suficientes")
-T.set_index(["condição", "manipulação"]).round(3) if rows else None""")
+print("α/R que o critério original da §2.3 (COM RÓTULO, antes da §2.3.1) escolheria:", alt if alt else "—")
+T.set_index(["condição", "manipulação", "regra"]).round(3) if rows else None""")
 
 md(r"""### 5.4 Controle: feature 19219 × 10 features aleatórias (100 claims de teste)
 
@@ -654,7 +773,7 @@ específica, as aleatórias devem ficar perto do α = 0.""")
 
 code(r"""rand = [r for r in cells if r["direction"].startswith("rand") and r["subset"]]
 if not rand:
-    print("controle aleatório ainda não rodado (roda depois da grade da feature)")
+    print("controle aleatório adiado (decisão do Lucas, 29/09/2026 — ver §2.4)")
 else:
     rows = []
     for cond in COND:

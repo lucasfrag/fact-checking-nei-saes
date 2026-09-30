@@ -29,6 +29,10 @@ MODELS = {
     "llama3.1:8b": "meta-llama/Llama-3.1-8B-Instruct",
     "deepseek-r1:8b": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
     "qwen3:8b": "Qwen/Qwen3-8B",
+    # só para o replay do veredito (RQ1, `factcheck_sae --replay`); mesmos checkpoints do pipeline
+    # (HF_MODEL_MAP em old_method/shared/config.py)
+    "gemma3:4b": "google/gemma-3-4b-it",
+    "gemma4:e4b": "google/gemma-4-E4B-it",
 }
 
 # rótulos canônicos do fact-checking

@@ -6,6 +6,14 @@ export const MODELS: {[key: string]: {layer: number, label: string, hf: string}}
   'llama-3.1-8b-instruct': {layer: 15, label: 'Llama-3.1-8B-Instruct · layer 15', hf: 'meta-llama/Llama-3.1-8B-Instruct'},
   // 'deepseek-r1-distill-llama-8b': {layer: 15, label: 'DeepSeek-R1-Distill-Llama-8B · layer 15', hf: 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B'},
   // 'qwen3-8b': {layer: 19, label: 'Qwen3-8B · layer 19', hf: 'Qwen/Qwen3-8B'},
+  // 'gemma-3-4b-it': {layer: ?, label: 'Gemma-3-4B-it · layer ?', hf: 'google/gemma-3-4b-it'},
+  // 'gemma-4-e4b-it': {layer: ?, label: 'Gemma-4-E4B-it · layer ?', hf: 'google/gemma-4-E4B-it'},
+  // 'ministral-3-8b-instruct': {layer: ?, label: 'Ministral-3-8B-Instruct · layer ?', hf: 'mistralai/Ministral-3-8B-Instruct-2512'},
+};
+
+// Features with steering results (viewer/<path>/steering/<atom>.json).
+export const STEERED: {[path: string]: number[]} = {
+  'llama-3.1-8b-instruct/layer-15': [19219],
 };
 
 export const FC_FAMILY = {

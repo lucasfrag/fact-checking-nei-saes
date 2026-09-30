@@ -500,7 +500,10 @@ taxa de NEI **0,42 → ~0,62** com a leitura correta.
   (SUPPORTED, REFUTED, NOT ENOUGH EVIDENCE, CONFLICTING EVIDENCE), que é como o modelo escreve o veredito
   (em minúsculas ele está só falando dos rótulos): (1) se a resposta começa com um rótulo, usa esse rótulo — quase
   sempre o caso com evidência; (2) se não começa (sem evidência o modelo às vezes raciocina antes), usa
-  o primeiro rótulo que aparece; (3) sem rótulo nenhum → NEI (p.ex. recusas por extenso). A regra do
+  o primeiro rótulo que aparece — **ignorando enumerações das opções** como *"I cannot determine whether
+  the claim is SUPPORTED, REFUTED, NOT ENOUGH EVIDENCE, or CONFLICTING…"*, que são o modelo citando o formato,
+  não decidindo (achado no viewer em 28/09; afeta no máximo 8/500 respostas por célula, nb03 §3.1.1);
+  (3) sem rótulo nenhum → NEI (p.ex. recusas por extenso). A regra do
   pipeline fica ao lado. Com ela, o efeito do steering fica mais claro
   (p.ex. aumentar a feature com evidência passa a aumentar a abstenção, como esperado).
 

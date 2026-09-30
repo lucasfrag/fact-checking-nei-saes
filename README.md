@@ -17,7 +17,8 @@ and whether suppressing it improves fact-checking on AVeriTeC.
 | Fact-checking pipeline (Single-step vs. Iterative question generation) | [`lucasfrag/iterative-question-generation`](https://github.com/lucasfrag/iterative-question-generation) |
 
 Part of an MSc dissertation (PPGCC/PUCRS). Status: **work in progress** — the Llama-3.1-8B SAE is
-released; DeepSeek-R1-Distill-Llama-8B and Qwen3-8B are being trained.
+released; SAEs for the other models of the Single-step vs. Iterative study (DeepSeek-R1-Distill-Llama-8B,
+Qwen3-8B, Gemma-3-4B-it, Gemma-4-E4B-it, Ministral-3-8B-Instruct) are being trained.
 
 ---
 
@@ -35,6 +36,9 @@ position in-distribution, so the abstention mechanism can be read off the SAE's 
 | `meta-llama/Llama-3.1-8B-Instruct` | 15 | 32,768 | 32 | 2 | 0.234 | **19219** |
 | `deepseek-ai/DeepSeek-R1-Distill-Llama-8B` | 15 | | | | | *in progress* |
 | `Qwen/Qwen3-8B` | 19 | | | | | *in progress* |
+| `google/gemma-3-4b-it` | *tbd* | | | | | *planned* |
+| `google/gemma-4-E4B-it` | *tbd* | | | | | *planned* |
+| `mistralai/Ministral-3-8B-Instruct-2512` | *tbd* | | | | | *planned* |
 
 Latent 19219 (Llama): 93.5% of the 200 claims that activate it most are NEI (4.7× the base rate);
 AUC (NEI vs. SUP/REF) = 0.783; its **magnitude** (not on/off) encodes abstention.
@@ -55,7 +59,7 @@ feats = sae.encode(resid)      # raw residual stream at blocks.15.hook_resid_pos
 
 ```
 fcsae/                    the package
-  config.py               presets (v3_llama, v3_deepseek, v3_qwen3) and the Gao et al. optimization flags
+  config.py               presets (v3_llama, v3_deepseek, v3_qwen3; Gemma presets to come) and the Gao et al. optimization flags
   data/                   VitaminC + FEVER loaders, verdict-prompt template
   harvest/harvest.py      collect residual-stream activations (resumable, deterministic order)
   sae/                    TopK SAE (AuxK, input normalization, EMA, …) and trainer (auto-resume)

@@ -16,7 +16,7 @@ e depois executado:
 | 02 | `02-sae-v3.ipynb` | **SAE v3** (todos os dados + Gao et al. 2024): auditoria, features mortas, v1 × v3, feature 19219 | pronto |
 | 03 | `03-steering-sae-v3.ipynb` | steering com a feature 19219: desenho + referências, fidelidade ao pipeline, curvas × β, β escolhido na validação, controle aleatório (resultados atualizam ao reexecutar) | em andamento |
 | 04 | `04-generalizacao-v3.ipynb` | a feature 19219 em AVeriTeC, Climate-FEVER, SciFact, HealthVer | a fazer |
-| 05 | `05-cross-model-v3.ipynb` | Llama × DeepSeek × Qwen3 (e depois os demais) no v3 | a fazer |
+| 05 | `05-cross-model-v3.ipynb` | todos os modelos do estudo Single × Iterative (Llama, DeepSeek, Qwen3, Gemma3, Gemma4, Ministral3) no v3 | a fazer |
 
 ## Histórico — SAE v1 (`v1-historico/`)
 

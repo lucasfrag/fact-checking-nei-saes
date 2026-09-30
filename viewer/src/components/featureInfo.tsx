@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from "react"
 import { Link } from "react-router-dom"
-import { normalizeSequences, Feature, FeatureInfo } from "../types"
+import { normalizeSequences, Feature, FeatureInfo, SteeringInfo } from "../types"
 import TokenHeatmap from "./tokenHeatmap";
 import Histogram from "./histogram"
 import Tooltip from "./tooltip"
-import { get_feature_info } from "../interpAPI"
-import { pathForFeature } from "../autoencoder_registry"
+import { get_feature_info, get_steering } from "../interpAPI"
+import { pathForFeature, STEERED } from "../autoencoder_registry"
+import SteeringPanel from "./steeringPanel"
 
 const LABEL_COLORS: {[key: string]: string} = {NEI: '#f0883e', SUP: '#2a9d5c', REF: '#d9534f', CONF: '#7a5cc4'}
 
@@ -23,6 +24,7 @@ const pct = (x: number | null | undefined) => (x === null || x === undefined) ? 
 
 export default ({ feature }: {feature: Feature}) => {
   const [data, setData] = useState(null as FeatureInfo | null)
+  const [steering, setSteering] = useState(null as SteeringInfo | null)
   const [showingMore, setShowingMore] = useState({} as {[key: string]: boolean})
   const [showEvidence, setShowEvidence] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
@@ -48,6 +50,11 @@ export default ({ feature }: {feature: Feature}) => {
       }
     }
     fetchData()
+    setSteering(null)
+    if ((STEERED[feature.autoencoder.path] || []).includes(feature.atom)) {
+      get_steering(feature.autoencoder.path, feature.atom)
+        .then((s) => { if (currentFeatureRef.current === feature) setSteering(s) }).catch(() => {})
+    }
   }, [feature])
 
   if (isLoading) {
@@ -130,6 +137,7 @@ export default ({ feature }: {feature: Feature}) => {
           </table>
         }
       </div>
+      {steering ? <SteeringPanel data={steering}/> : null}
       {all_sequences.map(({label, sequences, default_show, note}, idx) => {
         const n_show = showingMore[label] ? sequences.length : default_show;
         return (
