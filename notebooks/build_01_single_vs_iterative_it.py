@@ -363,8 +363,145 @@ md(r"""👉 **Leitura.** No Llama Single-step, a acurácia cai de **0,436 para ~
   **tamanho** do viés nelas não pode ser medido: os JSONL guardam só a predição final, não o texto da
   resposta — fica registrado como limitação.
 
-**Próximo passo possível:** re-rodar só o **passo de veredito** dos outros modelos HF (mesma evidência,
-guardando o texto), como no replay do Llama — sem refazer a busca de evidências.""")
+**Feito (30/09/2026):** o passo de veredito dos outros 4 modelos HF foi re-rodado da mesma forma — ver §8.""")
+
+md(r"""## 8. Resultados corrigidos — todos os modelos HF (replay do veredito, 30/09/2026)
+
+**O que foi feito.** Para cada um dos 5 modelos e cada método, re-rodamos **só o último passo** do
+pipeline — o veredito — com **exatamente o mesmo prompt**: a mesma claim e a **mesma evidência** que o
+pipeline recuperou (lidas do `averitec_dev.jsonl` de cada rodada), o mesmo checkpoint HF em 4 bits
+nf4, geração *greedy*, até 1.536 tokens, `enable_thinking=False` e remoção do `<think>` — as mesmas
+configurações de `old_method/shared/llm/hf_llm.py` e `shared/config.py` (commit `dc19749`). **A busca de
+evidências e a geração de perguntas não foram refeitas.** Desta vez o **texto completo** da resposta foi
+guardado, e o rótulo é lido como na §7: o **1º rótulo que o modelo escreve**, em maiúsculas e por
+extenso, ignorando enumerações das opções (`first_label` em `fcsae/steering/factcheck_sae.py`).
+
+- Llama: `results/v3_llama/steer_sae/{single,iterative}__none__b+0.00.json` (o α = 0 do steering);
+- demais: `results/replay/<modelo>-hf/{single,iterative}__none__b+0.00.json`
+  (`python -m fcsae.steering.factcheck_sae --replay <tag>`; fila em `scripts/run_replay_all.sh`).
+
+**O custo (queries, tokens) não muda** — vem da busca, que não foi refeita — então a Tabela 2 continua
+válida. Mudam as Tabelas 1, 3 e 4.""")
+
+md(r"""### 8.1 O replay reproduz o pipeline?
+
+**Como ler.** Para cada modelo e método: **concordância** = fração dos 500 claims em que o replay, lido
+com a **mesma regra do pipeline** (`normalize`), dá o mesmo rótulo que o pipeline gravou. Mede se o
+replay regerou as mesmas respostas. As divergências vêm de respostas longas em que a geração tomou outro
+caminho (em 4 bits, pequenas diferenças numéricas podem mudar o argmax num token e, daí em diante, o
+texto); nesses claims, o rótulo corrigido é o do replay.""")
+
+code(r"""from fcsae.steering.factcheck_sae import first_label, normalize
+RPF = {m: f"../results/replay/{m}-hf" for m in HF}; RPF["llama3.1-8b"] = "../results/v3_llama/steer_sae"
+
+def metrics_from(pred, gold):
+    F = {c: f1(pred, gold, c) for c in CLS}
+    nn = [(p, g) for p, g in zip(pred, gold) if p != "NEI"]
+    return {"acc": np.mean([p == g for p, g in zip(pred, gold)]),
+            "macroF1": np.mean([F["SUP"], F["REF"], F["NEI"]]), "macroF1_4": np.mean(list(F.values())),
+            **{f"F1_{c}": F[c] for c in CLS}, "nei_rate": np.mean([p == "NEI" for p in pred]),
+            "err_nonNEI": np.mean([p != g for p, g in nn]) if nn else np.nan, "pred": pred, "gold": gold, "n": len(pred)}
+
+fx, rows = {}, []
+for m in HF:
+    for k in DIR:
+        r = json.load(open(f"{RPF[m]}/{k}__none__b+0.00.json", encoding="utf-8"))
+        rule = [normalize(x) for x in r["raw"]]
+        agree = np.mean([a == b for a, b in zip(rule, r["pipeline_pred"])])
+        fx[(m, k)] = {**metrics_from([first_label(x) for x in r["raw"]], r["gold"]), "ids": r["ids"], "pipe": r["pipeline_pred"]}
+        rows.append([NAME[m], k, len(r["raw"]), agree, sum(a != b for a, b in zip(rule, r["pipeline_pred"]))])
+pd.DataFrame(rows, columns=["Modelo", "Método", "claims", "concordância", "divergentes"]).set_index(["Modelo", "Método"]).round(3)""")
+
+md(r"""### 8.2 Tabela 1 corrigida — desempenho geral
+
+**Como ler.** Mesmo formato da Tabela 1 (§2), com o rótulo lido corretamente. A 2ª tabela mostra a
+**diferença** para a Tabela 1 original (corrigida − original): negativo = a regra do pipeline inflava a
+métrica.""")
+
+code(r"""T1c = table1(fx, HF); display(T1c)
+print("diferença para a Tabela 1 original (corrigida − original):")
+(T1c - T1).round(3)""")
+
+md(r"""### 8.3 Tabelas 3 e 4 corrigidas — abstenção e erro fora de NEI
+
+**Como ler.** Mesmo formato das Tabelas 3 e 4 (§4). *Tabela 3:* taxa de NEI e Δ = iterativo − single.
+*Tabela 4:* entre as predições que não são NEI, a fração errada.""")
+
+code(r"""T3c = delta_table(fx, HF, "nei_rate"); T4c = delta_table(fx, HF, "err_nonNEI")
+print("Tabela 3 corrigida — taxa de NEI"); display(T3c)
+print("Tabela 4 corrigida — erro condicionado a predições não-NEI"); display(T4c)""")
+
+md(r"""### 8.4 A conclusão da RQ1 muda? — Single × Iterative, por modelo
+
+**Como ler.** Para cada modelo: a acurácia do Single e do Iterative com a regra original (Tabela 1) e
+com a leitura correta, e o **teste de McNemar exato** entre os dois métodos na leitura correta (mesmos
+500 claims; só contam os claims em que exatamente um dos dois acerta — Dietterich, 1998). **▲** = o
+iterativo é melhor com p < 0,05; **=** = sem diferença significativa; **▼** = o iterativo é pior.""")
+
+code(r"""from scipy.stats import binomtest
+from IPython.display import Markdown, display
+
+def mcnemar(pa, pb, gold):
+    b = sum((x == g) and (y != g) for x, y, g in zip(pa, pb, gold)); c = sum((x != g) and (y == g) for x, y, g in zip(pa, pb, gold))
+    return binomtest(min(b, c), b + c, 0.5).pvalue if b + c else 1.0
+
+rows, lines = [], []
+for m in HF:
+    S, I = fx[(m, "single")], fx[(m, "iterative")]
+    assert S["ids"] == I["ids"]                         # mesmos claims, mesma ordem
+    pv = mcnemar(S["pred"], I["pred"], S["gold"]); pv0 = mcnemar(S["pipe"], I["pipe"], S["gold"])   # predições originais, alinhadas por claim_id
+    d = I["acc"] - S["acc"]
+    v = ("▲ iterativo melhor" if d > 0 else "▼ iterativo pior") if pv < 0.05 else "= sem diferença significativa"
+    rows.append([NAME[m], hf[(m, "single")]["acc"], hf[(m, "iterative")]["acc"], pv0, S["acc"], I["acc"], pv, v])
+    lines.append(f"- **{NAME[m]}: {v}** — acurácia (leitura correta) {S['acc']:.3f} → {I['acc']:.3f} ({100*d:+.1f} pts, p = {pv:.2g}); "
+                 f"com a regra original era {hf[(m, 'single')]['acc']:.3f} → {hf[(m, 'iterative')]['acc']:.3f}.")
+display(Markdown("\n".join(lines)))
+pd.DataFrame(rows, columns=["Modelo", "Acc S (original)", "Acc I (original)", "p (original)", "Acc S (corrigida)",
+                            "Acc I (corrigida)", "p (corrigida)", "veredito (corrigida)"]).set_index("Modelo").round(3)""")
+
+md(r"""👉 **Leitura (30/09/2026).** **A conclusão da RQ1 se mantém — e fica mais forte.** Com a leitura
+correta, o iterativo tem acurácia maior que o single-step nos **5 modelos**, e a diferença é
+**estatisticamente significativa em todos** (McNemar, p < 0,05). Com a regra original, o Llama
+(p = 0,19) e o Qwen3 (p = 0,053) **não** eram significativos. O Qwen3 fica no limite (p = 0,049).
+
+- **O defeito pesava sobretudo no Llama e no Qwen3** (acurácia −0,03 a −0,08 ao corrigir) e pouco no
+  DeepSeek; no **Gemma3 e no Gemma4 praticamente não existe** (±0,002), porque eles escrevem só o rótulo
+  ou explicações que não contêm "refute"/"false".
+- **A super-abstenção é maior do que parecia:** no Single-step, o NEI predito vai a 0,44–0,62 em quatro
+  modelos (Tabela 3 corrigida), contra 7% de NEI no gold. O iterativo reduz a abstenção em todos
+  (Δ médio −0,12).
+- **O erro fora de NEI sobe com o iterativo** em três modelos (Tabela 4 corrigida: Llama +0,062, Qwen3
+  +0,078, DeepSeek +0,026) e cai levemente nos dois Gemma — isto é, parte das decisões a mais que o
+  iterativo toma sai errada. É a mesma troca que o steering mostra (`03-steering-sae-v3.ipynb`).
+- **Ressalva:** no DeepSeek o replay reproduz 97% das respostas (15 e 14 claims divergentes, §8.1); nos
+  demais, 99–99,8%.""")
+
+md(r"""### 8.5 Distribuição das predições e matrizes de confusão corrigidas
+
+**Como ler.** Como na §5, com o rótulo lido corretamente: contagem de cada rótulo predito e uma matriz
+por modelo × método (linhas = verdadeiro, colunas = predito, células = número de claims).""")
+
+code(r"""rows = []
+for m in HF:
+    for k in DIR:
+        c = collections.Counter(fx[(m, k)]["pred"]); c0 = collections.Counter(hf[(m, k)]["pred"])
+        rows.append([NAME[m], k] + [f"{c.get(x, 0)} ({c.get(x, 0) - c0.get(x, 0):+d})" for x in CLS])
+display(Markdown("Contagens com a leitura correta; entre parênteses, a diferença para a §5 (regra original)."))
+display(pd.DataFrame(rows, columns=["Modelo", "Método"] + CLS).set_index(["Modelo", "Método"]))
+
+fig, axes = plt.subplots(2, len(HF), figsize=(3.1 * len(HF), 6.2))
+for j, m in enumerate(HF):
+    for i, k in enumerate(["single", "iterative"]):
+        ax = axes[i, j]; M = cm(fx[(m, k)]["pred"], fx[(m, k)]["gold"])
+        ax.imshow(M, cmap="Blues", vmin=0, vmax=M.max())
+        for a in range(4):
+            for b in range(4):
+                ax.text(b, a, f"{int(M[a,b])}", ha="center", va="center", fontsize=8, color="white" if M[a, b] > .6 * M.max() else "black")
+        ax.set_xticks(range(4)); ax.set_xticklabels(CLS, fontsize=7); ax.set_yticks(range(4)); ax.set_yticklabels(CLS, fontsize=7)
+        ax.set_title(f"{NAME[m]} · {k} (corrigida)", fontsize=8)
+        if j == 0: ax.set_ylabel("verdadeiro", fontsize=8)
+        if i == 1: ax.set_xlabel("predito", fontsize=8)
+plt.tight_layout(); plt.show()""")
 
 nb = new_notebook(cells=cells, metadata={
     "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
