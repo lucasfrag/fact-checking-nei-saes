@@ -1,0 +1,1 @@
+{"cond": "single", "direction": "none", "beta": 0.0, "R": null, "layer": 15, "max_new_tokens": 1536, "ids": [0, 1], "gold": ["REF", "REF"], "pred": ["REF", "NEI"], "raw": ["REFUTED", "NOT ENOUGH EVIDENCE"], "readable": [true, true], "pipeline_pred": ["REF", "NEI"]}

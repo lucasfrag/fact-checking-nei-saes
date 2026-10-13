@@ -1,4 +1,4 @@
-import {Feature, FeatureInfo, FeatureIndex, SteeringInfo} from './types';
+import {Feature, FeatureInfo, FeatureIndex, SteeringInfo, SteeringAll} from './types';
 
 // Per-feature JSONs live in the companion Hugging Face dataset (CORS-enabled):
 //   viewer/<model>/layer-<L>/atoms/<atom // 1000>/<atom>.json   and   viewer/<model>/layer-<L>/index.json
@@ -23,6 +23,12 @@ export async function get_feature_info(feature: Feature): Promise<FeatureInfo> {
 
 export async function get_steering(path: string, atom: number): Promise<SteeringInfo> {
   const url = `${DATA_BASE}/${path}/steering/${atom}.json`
+  if (!(url in cache)) cache[url] = await load_json(url)
+  return cache[url]
+}
+
+export async function get_steering_all(path: string, atom: number, cond: string): Promise<SteeringAll> {
+  const url = `${DATA_BASE}/${path}/steering/${atom}_all_${cond}.json`
   if (!(url in cache)) cache[url] = await load_json(url)
   return cache[url]
 }

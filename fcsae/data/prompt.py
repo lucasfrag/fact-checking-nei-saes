@@ -36,7 +36,16 @@ def build_verdict_prompt(claim: str, evidence: List[str], max_evidence: int = 4)
             f"{INSTRUCTIONS}")
 
 
-def templated_input_ids(tok, prompt: str, device, max_seq_len: int = 512):
+# Modelos de raciocínio (DeepSeek-R1-Distill): o generation prompt termina em "<think>\n"; fechar o bloco vazio
+# faz o modelo escrever o veredito direto, e o último token do prompt volta a ser a posição da decisão.
+EMPTY_THINK = "\n</think>\n\n"
+
+
+def apply_empty_think(text: str, empty_think: bool) -> str:
+    return text + EMPTY_THINK if empty_think and text.endswith("<think>\n") else text
+
+
+def templated_input_ids(tok, prompt: str, device, max_seq_len: int = 512, empty_think: bool = False):
     """Aplica o chat template (com generation prompt), tokeniza e trunca. Retorna
     (input_ids [1,seq], decision_index) — decision_index é o último token (a posição
     da decisão)."""
@@ -53,6 +62,7 @@ def templated_input_ids(tok, prompt: str, device, max_seq_len: int = 512):
              {"role": "user", "content": prompt}],
             add_generation_prompt=True, tokenize=False,
         )
+    text = apply_empty_think(text, empty_think)
     ids = tok(text, add_special_tokens=False, return_tensors="pt",
               truncation=True, max_length=max_seq_len).input_ids.to(device)
     return ids, ids.shape[1] - 1

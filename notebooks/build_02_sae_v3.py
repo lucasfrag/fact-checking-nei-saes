@@ -91,7 +91,7 @@ md(r"""## 3. Metodologia — o que seguimos do Gao et al. (2024)
 | item | Gao et al. (2024) | v1 / 1º treino v3 | **v3 final** |
 |---|---|---|---|
 | arquitetura | TopK, k=32 (§2.3) | ✓ | ✓ |
-| dicionário | 32.768 latentes | ✓ | ✓ |
+| dicionário | 32.768 features | ✓ | ✓ |
 | perda auxiliar | AuxK, α=1/32, k_aux=512 (§A.2) | ✓ | ✓ |
 | limiar de "feature morta" | 10M tokens (nota 7, seguindo Templeton et al. 2024) | ~2M | ✓ (5.000 passos × 2.048) |
 | init do encoder | transposta do decoder (§A.1) | ✓ | ✓ |
@@ -115,7 +115,7 @@ tokens × 4.096 dims não cabe na GPU de 16 GB.
 **Duas notas de fidelidade.**
 - O texto do §A.6 diz que a AuxK é normalizada *"per token"*; o código oficial normaliza pela
   variância **do lote** (`normalized_mse`). Seguimos o **código** de referência.
-- O lr de 1e-4 é o padrão do código oficial para 32.768 latentes; não re-varremos o lr para o
+- O lr de 1e-4 é o padrão do código oficial para 32.768 features; não re-varremos o lr para o
   nosso batch. A nota 16 do paper (*"lowering learning rates helped with decreasing dead
   latents"*) vai na mesma direção da nossa troca 4e-4 → 1e-4.
 
@@ -184,7 +184,7 @@ print(f"v3 alinhado ao final ({v3m['steps']} passos): {v3m['dead_features']} mor
 md(r"""👉 **Leitura.** O alinhamento resolveu o principal defeito do dicionário. No treino alinhado,
 a contagem de mortas **oscila perto de zero** (features que param são reanimadas pela AuxK) e
 **cai** no fim (~10 → 2), enquanto no treino anterior ela só subia. Ficamos **bem abaixo** dos
-7% do Gao — com a ressalva de que o SAE dele é muito maior (16M latentes).""")
+7% do Gao — com a ressalva de que o SAE dele é muito maior (16M features).""")
 
 md(r"""### 4.2 v1 × v3: reconstrução e localização da abstenção
 

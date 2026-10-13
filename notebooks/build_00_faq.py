@@ -21,7 +21,7 @@ perguntas novas entram no fim.
 3. [Quantos SAEs temos treinados?](#3)
 4. [Quais modelos no Single-vs-Iterative e quais têm SAE?](#4)
 5. [Qual a diferença das versões dos SAEs? Por que tantos no Llama e no Qwen?](#5)
-6. [Como descobrimos que a camada 19 é a melhor pro Qwen3?](#6)
+6. [Como escolhemos a camada de cada modelo (15 no Llama, 22 no Qwen3; DeepSeek sendo refeito)?](#6)
 7. [O que é o SAE v3 e o que significa "seguir o Gao et al. (2024)"?](#7)
 8. [Por que as features mortas caíram de 33–48% para ~0%?](#8)
 9. [Por que a AUC da direção caiu no v3 (0,839 → 0,796)?](#9)
@@ -29,11 +29,24 @@ perguntas novas entram no fim.
 11. [Como é feita a validação — como escolhemos o α do steering?](#11)
 12. [O que significa "todas as linhas usam os mesmos 250 claims da metade de teste"?](#12)
 13. [O que é CAA?](#13)
-14. [Como decidimos se o steering "melhorou" ou "piorou"?](#14)
+14. [Como decidimos se o steering "melhorou" ou "piorou"? O que é o "p (McNemar)"?](#14)
 15. [Por que o critério de qualidade do steering mudou de "legível" para "coerente"?](#15)
 16. [O que significa a fórmula do steering x ← x + α·d₁₉₂₁₉ — e de onde ela vem?](#16)
 17. [Que defeito foi achado na regra de rótulo do pipeline, e o que ele muda?](#17)
 18. [Por que a grade de steering foi cortada em |α/R| ≤ 1?](#18)
+19. [No DeepSeek a abstenção ficou espalhada em várias features. A literatura trata disso? Como fazemos o steering?](#19)
+20. [Steering com a feature × steering com a direção média: qual a diferença? O que fizemos antes é descartado?](#20)
+21. [Quantas features o SAE deve ter (32.768)? Como justificar esse hiperparâmetro?](#21)
+22. [No DeepSeek, quais features controlam a abstenção? O que a triagem de steering mostrou?](#22)
+23. [Como o cosseno entre uma feature e a direção de abstenção é calculado? O que ele significa?](#23)
+24. [O que é a "ativação" de uma feature (o eixo "how strongly the feature fires" do viewer)?](#24)
+25. [Qual a diferença entre "feature" e "ativação"?](#25)
+26. [Como a ativação é medida a partir da direção? Como sei se ela é forte ou fraca?](#26)
+27. [O que é, em detalhe, a "régua" de uma feature (o vetor do encoder)?](#27)
+28. [O que o steering da feature 12482 mostrou no Qwen3?](#28)
+29. [O que deu errado no treino do SAE do Gemma3 (perda "nan") e como foi corrigido?](#29)
+30. ["Ativação" do modelo × ativação de uma feature: de onde até onde vai cada número?](#30)
+31. [Por que a dose do steering passou a usar a norma centrada ($R_c$) e não a norma média?](#31)
 
 > **Atualização 27/09/2026:** o SAE principal agora é o **v3** (ver `02-sae-v3.ipynb`). As
 > respostas 1, 3 e 5 foram atualizadas; as 7–10 são novas.
@@ -178,7 +191,22 @@ O DeepSeek tem só 1 SAE porque não precisou de nenhum dos dois ajustes.
 """)
 
 md(r"""<a id="6"></a>
-## 6. Como descobrimos que a camada 19 é a melhor pro Qwen3?
+## 6. Como escolhemos a camada de cada modelo (15 no Llama, 22 no Qwen3; DeepSeek sendo refeito)?
+
+> **Atualização (06/10/2026) — leia primeiro.** Regra adotada para todos os modelos: **a camada onde a direção de
+> abstenção é mais legível na varredura** (AUC máxima; em caso de empate, a primeira do platô).
+> - **Qwen3:** trocado da camada **19** para a **22** (início do platô; AUC 0,867, empatada com a 26 — diferença de 0,0003,
+>   dentro do ruído; a 19 ficava 0,03 abaixo). O SAE do Qwen3 está sendo treinado na 22 (preset `v3_qwen3_l22`).
+> - **Qwen3, resultado (08/10/2026):** SAE na camada 22 pronto (120.092 passos; FVU held-out 0,065; 7 features mortas).
+>   Direção de abstenção: AUC held-out **0,831**. A feature **12482** lidera os dois critérios (cosseno 0,655; d de Cohen
+>   1,08), como a 19219 no Llama; 87,5% de NEI no top-200; AUC 0,782; 1 feature cobre 64% da direção (Llama: 70%).
+>   Publicado no HF (SAE, dados, viewer). Steering da 12482 em andamento (mesma grade do Llama).
+> - **DeepSeek:** a varredura antiga usou só **40 exemplos por classe** (descuido na sessão de 22/09; os outros modelos
+>   usaram 1.200). **Refeita com 1.200 por classe (06/10/2026):** a melhor camada é a **15** (AUC **0,772**), com platô de
+>   0,76–0,77 da 16 até a 30 — ou seja, a camada 15 estava certa, e o DeepSeek **não** é "fraco em toda a rede" (a
+>   varredura de 40 exemplos subestimava a AUC: 0,672). A camada não explica a abstenção espalhada (pergunta 19).
+>   Por decisão do Lucas, o SAE do DeepSeek será **refeito do zero** (camada e ordem **a definir pelo Lucas**); o antigo foi retirado do HF.
+> - O texto abaixo é o histórico de como a escolha foi feita até aqui.
 
 Em **duas etapas** (com uma ressalva honesta no fim).
 
@@ -206,6 +234,25 @@ subida), mas o **pico exato é a camada 26 (0.867)** — não a 19. Ou seja, a 1
 literalmente a melhor; é uma camada **boa, no platô**, fixada pela pista inicial e confirmada
 pela varredura. A diferença pro pico é pequena; refazer o Qwen3 na 26 é um ajuste fino possível.
 
+**E o Llama e o DeepSeek (camada 15)?** A mesma varredura (`results/<preset>/layer_sweep.json`):
+
+| modelo | exemplos por classe | melhor camada | AUC máx. | camada usada | AUC na usada |
+|---|---|---|---|---|---|
+| Llama-3.1-8B | 1.200 | 15 | 0,835 | 15 | 0,835 |
+| Qwen3-8B | 1.200 | 26 | 0,867 | 19 | 0,837 |
+| DeepSeek-R1-Distill-Llama-8B | **40** | 15 | 0,672 | 15 | 0,672 |
+
+- **Llama:** a AUC sobe entre as camadas 10 e 13 e faz platô a partir da 15 (0,81–0,83) — a 15 é o pico. Também é uma
+  camada com SAEs públicos para o Llama-3.1-8B (Llama Scope, He et al., 2024), o que dá referência externa.
+- **DeepSeek:** sobe na 13–15 e faz platô 0,65–0,67 entre 15 e 22; a 15 é a melhor da varredura. **Ressalva:** essa
+  varredura usou só **40 exemplos por classe** (ruidosa); com os dados completos, a AUC da direção na camada 15 é
+  **0,779**. Como a camada pode influenciar o quanto a abstenção se concentra numa feature do SAE (pergunta 19), a
+  varredura do DeepSeek será **refeita com 1.200 por classe** (na fila depois do Qwen3, 06/10/2026;
+  `results/v3_deepseek/layer_sweep.json`).
+- **Por que a camada importa:** o mesmo comportamento aparece em profundidades diferentes em cada modelo (o Qwen3 só
+  "acende" a partir da 18–20), então usar a mesma camada para todos subestimaria alguns. As normas do resíduo também
+  crescem ~100× com a profundidade — por isso o steering usa α/R (pergunta 16).
+
 > O gráfico **AUC × camada** dos 3 modelos (com a camada usada marcada) está no notebook
 > **`v1-historico/04-cross-model.ipynb`**, §1 (metodologia).
 """)
@@ -219,7 +266,7 @@ md(r"""<a id="7"></a>
 2. **Receita de treino do Gao et al. (2024)**, conferida linha a linha contra o paper e o código
    oficial (`openai/sparse_autoencoder`).
 
-**O que já seguíamos desde o v1:** TopK (k=32), 32.768 latentes, AuxK (α=1/32, k_aux=512),
+**O que já seguíamos desde o v1:** TopK (k=32), 32.768 features, AuxK (α=1/32, k_aux=512),
 init do encoder como transposta do decoder, decoder de norma 1.
 
 **O que faltava e entrou no v3** (cada item com a seção do paper): normalização da entrada
@@ -345,7 +392,14 @@ diferença de acurácia viria dos claims e não do método. Com os mesmos claims
 método — e isso também permite o teste de McNemar (pergunta 14), que compara acerto a acerto.
 
 **Custo:** 250 claims em vez de 500 → estimativas menos precisas e mais difícil dar
-"significativo". Por isso as **curvas** (§5.1) e a tabela por célula (§5.2) usam os **500**.
+"significativo". Por isso as **curvas** (§5.1), a tabela por célula (§5.2) e as matrizes de confusão
+(§5.2.1) usam os **500** — ali não há escolha de α, então não há o que "vazar". Pelo mesmo motivo, a
+comparação Single × Iterative do `01-single-vs-iterative-it.ipynb` (§8.4) usa os 500: são dois métodos
+fixos, nada é escolhido.
+
+**Alternativa que usaria os 500 no teste (não aplicada):** validação cruzada em 2 partes — escolher o α na
+metade par e testar na ímpar, depois o inverso, e juntar os dois resultados. Cada claim vira "teste" uma
+vez, sem ser usado para escolher o próprio α. Não exige rodar nada novo.
 """)
 
 # 13
@@ -376,7 +430,7 @@ pergunta 11). O CAA não fixa *qual* limiar usar — os 80% são escolha nossa.
 
 # 14
 md(r"""<a id="14"></a>
-## 14. Como decidimos se o steering "melhorou" ou "piorou"?
+## 14. Como decidimos se o steering "melhorou" ou "piorou"? O que é o "p (McNemar)"?
 
 Cada manipulação (diminuir ou aumentar a feature) é comparada com o **α = 0 da mesma condição**
 — mesmo prompt, mesma evidência; só muda o steering —, nos mesmos 250 claims de teste.
@@ -392,11 +446,31 @@ Cada manipulação (diminuir ou aumentar a feature) é comparada com o **α = 0 
   tem **baixo erro do tipo I** (raramente acusa diferença que não existe), enquanto outros
   testes comuns não devem ser usados.
 
+**O que é o "p (McNemar)".** É a probabilidade de ver uma diferença **pelo menos tão grande** quanto a
+observada **se os dois fossem, na verdade, igualmente bons** (e as diferenças fossem só sorte, claim a
+claim). p pequeno = difícil explicar a diferença por acaso. O corte usual é **p < 0,05** (menos de 5% de
+chance); p = 5e-9 significa 0,000000005.
+
+**Exemplo com os nossos números** (Single-step, α = 0 × α/R = −0,5, 250 claims de teste):
+
+| | claims |
+|---|---|
+| os dois acertam | 84 |
+| os dois erram | 103 |
+| **só o steering acerta** (b) | **56** |
+| **só o baseline acerta** (c) | **7** |
+
+Os 187 claims em que os dois concordam não dizem nada sobre quem é melhor e são ignorados. Sobram 63
+claims em que eles discordam; se fossem igualmente bons, cada um "ganharia" ~metade (≈ 31 a 32). O
+steering ganhou 56 de 63. A chance disso acontecer por sorte (uma moeda honesta dar 56 caras em 63
+lançamentos, ou algo mais extremo) é **p = 1,4 × 10⁻¹⁰** → a melhora é real. É por isso que o teste é
+"exato": o p é calculado diretamente pela distribuição binomial, sem aproximação.
+
 **Referências:** McNemar, Q. (1947). *Psychometrika, 12*(2), 153–157 · Dietterich, T. G. (1998).
 Approximate Statistical Tests for Comparing Supervised Classification Learning Algorithms.
 *Neural Computation, 10*(7), 1895–1923.
 
-> Onde ver: `03-steering-sae-v3.ipynb`, §5.0.
+> Onde ver: `03-steering-sae-v3.ipynb`, §5.0; e `01-single-vs-iterative-it.ipynb`, §8.4 (Single × Iterative).
 """)
 
 # 15
@@ -524,6 +598,456 @@ mais, nenhum critério de qualidade as escolheria, e cada célula levaria ~7 h.
 a degradação do texto e **limitar a faixa** (pergunta 13).
 
 > Onde ver: `03-steering-sae-v3.ipynb`, §2.3.
+""")
+
+# 19
+md(r"""<a id="19"></a>
+## 19. No DeepSeek a abstenção ficou espalhada em várias features. A literatura trata disso? Como fazemos o steering?
+
+> **Atenção (06/10/2026):** os resultados do DeepSeek nesta pergunta são do **SAE antigo (camada 15)**, que foi descartado e
+> será refeito do zero a partir de uma nova varredura de camadas (pergunta 6). Valem como histórico do método, não como resultado final.
+
+**O que vimos (01/10/2026, `fcsae/analysis/spread.py`, resultados em `results/<preset>/spread.json` no store).**
+Separação NEI × decidido (AUC no teste) usando só as k features de maior |Cohen's d|, e fração da direção
+de abstenção (diff-of-means) coberta pelas k linhas do decoder mais alinhadas:
+
+| k features | AUC Llama | AUC DeepSeek | cobertura Llama | cobertura DeepSeek |
+|---|---|---|---|---|
+| 1 | **0,784** | 0,689 | **70%** | 45% |
+| 5 | 0,808 | **0,780** | 82% | 73% |
+| 10 | 0,815 | 0,799 | 93% | 85% |
+| todas (teto) | 0,850 | 0,819 | — | — |
+
+No Llama **uma** feature (19219) já chega perto do teto; no DeepSeek são precisas **~5** (7531, 32642 e 18658,
+que sobem com NEI; 19789 e 25349, que sobem quando dá para decidir).
+
+**O que a literatura diz** (verificado nas fontes em 01/10/2026; conferir as citações internas no PDF antes de
+usar no texto):
+- **É esperado, não anomalia.** *Feature splitting*: um conceito se divide em várias features à medida que o
+  dicionário cresce (Bricken et al., 2023; Templeton et al., 2024 — *"we suspect that there are many features
+  representing different kinds of errors"*). *Feature absorption*: uma feature aparentemente pura deixa de
+  disparar em parte dos casos porque outras "absorvem" esse pedaço (Chanin et al., 2024, arXiv:2409.14507).
+- **Cuidado ao comparar modelos.** SAEs treinados no mesmo modelo e nos mesmos dados, mudando só a semente,
+  aprendem conjuntos de features diferentes (Paulo & Belrose, 2025, arXiv:2501.16615); se uma feature isolada
+  captura um comportamento depende também dos dados do SAE (Kissane et al., 2024, LessWrong — não revisado
+  por pares). Então **não** dá para afirmar "o DeepSeek representa a abstenção de forma mais distribuída";
+  o correto é "no nosso SAE ela aparece espalhada" → limitação.
+- **Steering com uma feature só** funciona quando há uma feature forte (O'Brien et al., 2024,
+  arXiv:2411.11296; Ferrando et al., 2025, que notam efeito mais fraco em outro modelo; Durmus et al., 2024).
+- **Várias features combinadas** têm precedente, mas não idêntico ao nosso caso: o **FGAA** (Soo et al., 2025,
+  arXiv:2501.09929) parte da diferença média das ativações do SAE entre exemplos com e sem o comportamento,
+  **descarta features densas** (ativas em > 1% dos tokens — a 7531 está ativa em 99% das decisões), fica com as
+  n₁ mais positivas (na prática **descarta as negativas**, n₂ = 0, porque pioravam o resultado) e passa por um
+  "effect approximator" treinado (do SAE-TS, Chalnev et al., 2024, arXiv:2411.02193) antes de somar ao resíduo.
+  Supera o steering com uma feature e o CAA no Gemma-2. O'Brien et al. (apêndice) também combinam duas features.
+  Uma combinação simples das nossas 5 features seria um método **inspirado** nesses, não o FGAA em si.
+  Arad et al. (2025, arXiv:2505.20063): escolher as features pelo **efeito na saída**, não só pela detecção.
+- **A direção média (diff-of-means / CAA), sem SAE, é a comparação mais forte**: com uma feature de SAE por
+  conceito, o steering é pior que a direção média (AxBench, Wu et al., 2025, arXiv:2501.17148: *"SAEs are not
+  competitive"*; Kantamneni et al., 2025, arXiv:2502.16681); Arditi et al. (2024) controlam a recusa com uma
+  direção média em 13 modelos.
+
+**Decisão (Lucas, 01/10/2026):** comparar, **nos dois modelos**, o steering com a **direção de abstenção
+(diff-of-means)** — assim a comparação entre modelos usa o mesmo método e responde "a feature do SAE é tão
+boa quanto a direção média?" (a pergunta do AxBench). A variante com várias features fica em aberto (ver acima:
+o FGAA não se aplica diretamente). Planejamento e resultados: notebooks de steering.
+""")
+
+# 20
+md(r"""<a id="20"></a>
+## 20. Steering com a feature × steering com a direção média: qual a diferença? O que fizemos antes é descartado?
+
+> **Atenção (06/10/2026):** os resultados do DeepSeek nesta pergunta são do **SAE antigo (camada 15)**, que foi descartado e
+> será refeito do zero a partir de uma nova varredura de camadas (pergunta 6). Valem como histórico do método, não como resultado final.
+
+**Nada é descartado.** O steering com a feature 19219 no Llama (`03-steering-sae-v3.ipynb`) continua sendo o
+resultado do método com SAE. A direção média é um experimento **a mais**, de comparação.
+
+| | **feature do SAE** (o que já fizemos) | **direção média** (diff-of-means) |
+|---|---|---|
+| de onde vem a seta $d$ | uma linha do **decoder do SAE**: uma das 32.768 "peças" em que o SAE decompõe o estado interno, escolhida pelas métricas (cosseno com a direção, Cohen's d, AUC) | **sem SAE**: média do estado interno na posição do veredito nos claims NEI **menos** a média nos SUP/REF (metade de treino), normalizada |
+| o que capta | só o que está **nessa feature** (no Llama, ~70% da direção de abstenção; no DeepSeek, ~45%) | o sinal de abstenção **inteiro**, esteja numa feature ou espalhado |
+| vantagem | **interpretável**: dá para ver o que a feature é (viewer, exemplos) | método mais simples e mais forte da literatura (Arditi et al., 2024; Panickssery et al., 2024; AxBench, Wu et al., 2025) |
+| no steering | x ← x + α·d, mesma grade α/R, mesmas 3 condições, mesmos 500 claims | **idem — só troca d** |
+
+**Não é "escolher a feature pela média":** a direção média não é uma feature; ela nem passa pelo SAE.
+
+**A pergunta que a comparação responde:** a feature interpretável funciona tão bem quanto a direção média?
+No Llama (feature forte) esperamos resultados parecidos; no DeepSeek (abstenção espalhada, pergunta 19), a
+direção deve funcionar melhor que uma feature só.
+
+**Status (01/10/2026):** implementado (`--direction abstention` em `fcsae/steering/factcheck_sae.py`; direção
+em `results/<preset>/abstention_direction.safetensors`, AUC held-out 0,796 no Llama e 0,779 no DeepSeek, iguais
+às da análise). A grade foi iniciada no DeepSeek e **pausada** pelo Lucas no mesmo dia, para priorizar os SAEs
+dos outros modelos (ver se a abstenção espalhada se repete). Retomar: `bash scripts/run_dirabst_queue.sh`.
+""")
+
+# 21
+md(r"""<a id="21"></a>
+## 21. Quantas features o SAE deve ter (32.768)? Como justificar esse hiperparâmetro?
+
+O número de features — o **tamanho do dicionário**, *n* (ou *width*) — é um **hiperparâmetro**: escolhido antes do
+treino, não aprendido. O encoder leva o resíduo (d = 4.096) a *n* números e o decoder faz o caminho de volta. Usamos
+**n = 32.768 = 8 × d** ("8× overcomplete"), com **k = 32** features ativas por token (outro hiperparâmetro).
+
+**O que a literatura diz** (verificado nas fontes em 01/10/2026; conferir as citações no PDF antes de usar no texto):
+- **Não existe um n "ótimo" derivado de princípios.** Gao et al. (2024, arXiv:2406.04093) ajustam leis de escala:
+  o erro sempre cai com n maior, e o número de tokens até convergir cresce ~Θ(n^0,6); mas chamam a comparação de
+  n diferentes num orçamento fixo de *"arguably unprincipled"*. Ou seja: **n se justifica por convenção e por
+  testes de robustez**, não por uma fórmula.
+- **32.768 com k = 32 é a convenção que seguimos:** o SAE oficial da OpenAI (repositório do Gao) para o GPT-2 é
+  `v5_32k`: *"2**15 = 32768"* features com *"TopK(32)"*; o **Llama Scope** (He et al., 2024, arXiv:2410.20526) treina
+  para o **Llama-3.1-8B** SAEs *"8x (32K features) and 32x (128K features)"* — inclusive o **L15R-8x**, mesma família,
+  mesma camada (15) e mesmo tamanho que o nosso; O'Brien et al. (2024, arXiv:2411.11296) usam *"k = 32 and an
+  expansion factor of 8"*. Gemma Scope (Lieberum et al., 2024, arXiv:2408.05147) publica de 16K a 1M.
+- **Quantidade de dados:** ~115 milhões de tokens / 32.768 ≈ **3.500 tokens por feature** (conta nossa). É
+  comparável ao único trabalho de SAE de domínio que achamos — O'Neill et al. (2025, arXiv:2508.09363), dados
+  médicos, ~49 milhões de tokens, de 2^14 a 2^20 features — e bem abaixo do Gemma Scope (4–16 bilhões). Nenhum
+  trabalho dá uma regra explícita de "tokens por feature"; reportamos a convergência e as features mortas (nb02).
+- **O tamanho muda o tipo de feature (*splitting*):** Bricken et al. (2023) foram de 512 a 131.072 features e
+  mostram conceitos se dividindo (*"the number of features specific to base64 contexts goes from 1 to 3 to many
+  more"*); Templeton et al. (2024): *"San Francisco"* vira 2 features no SAE de 4M e 11 no de 34M. Tamanhos
+  diferentes dão *"different 'resolutions'"* do mesmo objeto.
+- **A absorção piora com n maior:** Chanin et al. (2024, arXiv:2409.14507): *"absorption rate increases with higher
+  sparsity and higher SAE width"*; SAEBench (Karvonen et al., 2025, arXiv:2503.09532), com 4k/16k/65k: *"Absorption
+  scores worsen with increased dictionary size for all architectures except Matryoshka"*.
+- **Testar um segundo tamanho é prática comum:** Bricken e Templeton comparam tamanhos; o Gemma Scope publica uma
+  suíte de *feature splitting* (16K a 524K); o Llama Scope compara 8× e 32× na camada 15.
+- **Semente:** Paulo & Belrose (2025, arXiv:2501.16615): só ~30% das features se repetem entre sementes, e SAEs TopK
+  são *"more seed-dependent"* — controlar a semente ao comparar tamanhos.
+- **Alternativa ao problema de splitting/absorção — Matryoshka SAE** (Bussmann et al., 2025, arXiv:2503.17547):
+  treina dicionários **aninhados** de tamanhos crescentes, forçando os menores a reconstruir sozinhos; no SAEBench
+  é a única arquitetura cuja absorção quase não piora com o tamanho.
+
+**Como justificamos n = 32.768:** seguimos a convenção de Gao et al. (release oficial com n = 32.768, k = 32) e do
+Llama Scope (8× no Llama-3.1-8B, camada 15). Como a escolha é convencional e afeta se um conceito aparece numa
+feature ou em várias, **testamos a robustez** com um segundo tamanho (n = 8.192, mesmo k) e, idealmente, uma segunda
+semente — ver pergunta 19 e o experimento correspondente.
+""")
+
+# 22
+md(r"""<a id="22"></a>
+## 22. No DeepSeek, quais features controlam a abstenção? O que a triagem de steering mostrou?
+
+> **Atenção (06/10/2026):** os resultados do DeepSeek nesta pergunta são do **SAE antigo (camada 15)**, que foi descartado e
+> será refeito do zero a partir de uma nova varredura de camadas (pergunta 6). Valem como histórico do método, não como resultado final.
+
+**O experimento (02–04/10/2026).** Steering, **sem evidência**, com cada uma das 5 features de maior |Cohen's d|
+do SAE do DeepSeek (pergunta 19), mesma fórmula e mesmos 500 claims do Llama (`03-steering-sae-v3.ipynb`). Primeiro
+uma triagem em α/R = ±0,5; depois a grade completa (−1 a +1) de cada uma. Rótulo lido com o 1º rótulo escrito
+(§3.1 do nb03). Resultados em `results/v3_deepseek/steer_sae/none__feat<id>__b<α/R>.json`.
+
+**Triagem (taxa de NEI; sem steering = 0,546; ≥ 93% de respostas coerentes em todas):**
+
+| feature | tipo (sinal do d) | α/R = −0,5 | α/R = +0,5 | variação (+0,5 − −0,5) | controla? |
+|---|---|---|---|---|---|
+| **25349** | espelho (d < 0) | 0,608 | **0,340** | **−0,27** | sim — o maior efeito |
+| **32642** | sobe com NEI (d > 0) | **0,394** | 0,610 | **+0,22** | sim |
+| **18658** | sobe com NEI (d > 0) | 0,446 | 0,624 | +0,18 | sim |
+| 19789 | espelho (d < 0) | 0,524 | 0,406 | −0,12 | só de um lado |
+| 7531 | sobe com NEI (d > 0) | 0,508 | 0,482 | −0,03 | **não** |
+
+**O que isso mostra** (Lucas, 04/10/2026):
+1. **Três features controlam a abstenção nos dois sentidos**, cada uma no sentido esperado pelo tipo: nas que
+   **sobem com NEI** (32642 e 18658), **aumentar** a feature dá **mais** abstenção; na **espelho** (25349),
+   **aumentar** dá **menos** abstenção.
+2. **A 25349 tem o maior efeito:** com +0,5, o NEI cai de 0,546 para **0,340**, e a acurácia sobe de 0,296 para
+   0,380.
+3. **A 7531, que liderava as métricas de correlação (maior cosseno e maior Cohen's d), é a única sem efeito.** Isso
+   reforça que **correlação não garante controle** e que só o steering separa uma coisa da outra — o mesmo ponto de
+   Arad et al. (2025, arXiv:2505.20063): as features que detectam um conceito nem sempre são as que mudam a saída.
+4. **No DeepSeek, o controle da abstenção está distribuído em várias features.** É coerente com a análise de
+   espalhamento (pergunta 19): no Llama uma feature (19219) faz tudo; no DeepSeek são várias, cada uma com efeito
+   parcial. Isso abre a pergunta de se **combinar** essas features (p.ex. 32642 diminuída + 25349 aumentada) daria
+   um controle tão forte quanto o da 19219 no Llama.
+
+**Detalhes das grades completas já fechadas:**
+- **7531:** NEI entre 0,48 e 0,55 nas doses em que o modelo responde bem; em ±1 degenera (≈300 respostas em
+  *loop*), o que infla o NEI.
+- **32642:** monotônica — −0,5: 0,394 · 0: 0,546 · +0,5: 0,610 · +0,75: 0,690 · +1: 0,822 (84% coerentes); em −0,75
+  e −1 o modelo degenera (loops).
+- **19789:** espelho só do lado positivo — +0,75: **0,268** (95% coerentes), o maior "menos abstenção" visto; do
+  lado negativo fica em 0,52–0,55 até degenerar em −1.
+
+- **18658 (grade completa, 05/10/2026):** −1: **0,128** · −0,75: 0,394 · −0,5: 0,446 · −0,25: 0,514 · 0: 0,546 · +0,25: 0,568 ·
+  +0,5: 0,624 · +0,75: **0,738** · +1: 0,938 — monotônica e **coerente em ≥ 95% de −1 a +0,75** (78% em +1, com loops): a
+  maior faixa controlável do DeepSeek e **a melhor candidata** até aqui (era só a 4ª em Cohen's d e a 21ª em cosseno).
+- **19789 (grade completa):** espelho só do lado positivo; +0,75: 0,268; lado negativo sem efeito até degenerar.
+- **Ordem das candidatas:** a lista das 5 testadas veio do Cohen's d na **metade de treino**; com **todos os dados**, as 4
+  primeiras se mantêm, mas da 5ª em diante os valores empatam (0,413–0,423) e a ordem muda: 3424 vira a 5ª, 5393 a 6ª e a
+  25349 a 7ª. A 3424 e a 5393 **não foram testadas**.
+
+**Status (05/10/2026, decisão do Lucas):** DeepSeek pausado para seguir com o Qwen3. **Pendentes para o final** (LEIA-ME,
+seção "PENDÊNCIAS PARA O FINAL"): doses ±0,25/±0,75/±1 da 25349; 3424 e 5393; steering **com evidência** (Single e
+Iterative) na melhor feature; combinação de features. Publicado: painéis de steering das 5 features no viewer e nota no card
+do SAE do DeepSeek.
+""")
+
+# 23
+md(r"""<a id="23"></a>
+## 23. Como o cosseno entre uma feature e a direção de abstenção é calculado? O que ele significa?
+
+O estado interno do modelo na posição do veredito é um vetor de 4.096 números — um ponto num espaço de 4.096
+direções. O cosseno compara **duas setas** nesse espaço:
+
+1. **A direção de abstenção** $v$ (sem SAE): $v = \text{média}(h \mid \text{NEI}) - \text{média}(h \mid \text{SUP/REF})$,
+   na metade de treino das decisões — aponta "de decidir para abster". Antes da comparação, $v$ é **centralizada**
+   (subtrai-se a média dos seus 4.096 componentes), porque o SAE recebe as entradas centralizadas e normalizadas
+   (Gao et al., 2024, §2.1).
+2. **A direção da feature** $d_j$: a linha $j$ do **decoder** do SAE — a seta que a feature acrescenta ao estado
+   interno quando dispara (a reconstrução é $\hat{x} = \sum_j z_j\, d_j + b$).
+
+$$\cos(d_j, v) = \frac{d_j \cdot v}{\lVert d_j \rVert\, \lVert v \rVert}$$
+
+| cosseno | ângulo | leitura |
+|---|---|---|
+| 1 | 0° | apontam para o mesmo lado |
+| 0 | 90° | não têm relação |
+| −1 | 180° | apontam para lados opostos (feature "espelho") |
+
+**Nossos valores:** 19219 (Llama) 0,72 (~44°); 7531 (DeepSeek) 0,35 (~70°); 19789 (DeepSeek) −0,45.
+
+**Escala de referência:** em 4.096 dimensões, duas direções ao acaso têm cosseno perto de 0 (desvio típico
+≈ 1/√4.096 ≈ 0,016). Então 0,35 já é muito acima do acaso, e 0,72 é excepcional.
+
+**Por que usamos:** o steering empurra o modelo **ao longo de** $d_j$ (Ferrando et al., 2025, Eq. 4); se $d_j$ aponta
+para o mesmo lado de $v$, espera-se que mexa na abstenção. É uma **expectativa**, não uma garantia: no DeepSeek a
+7531 tem o maior cosseno positivo e não controla a abstenção (pergunta 22).
+
+> Código: `fcsae/analysis/abstention.py` (cosseno de todas as features) e `fcsae/analysis/selection_map.py`
+> (dados do gráfico "Cohen's d × cosine" do viewer).
+""")
+
+md(r"""<a id="24"></a>
+## 24. O que é a "ativação" de uma feature (o eixo "how strongly the feature fires" do viewer)?
+
+**Em uma frase:** é um número ≥ 0 que diz **o quanto a feature está presente** no estado interno do modelo no
+momento em que ele vai escrever o veredito. 0 = a feature não disparou; quanto maior, mais forte ela disparou.
+
+**Passo a passo, para um claim:**
+
+1. O modelo lê o prompt (claim + evidências). Na posição do veredito, na camada escolhida (Llama: 15), pegamos o
+   estado interno $x$: um vetor de 4.096 números.
+2. **Normalização** (Gao et al., 2024, §2.1): tiramos a média dos 4.096 números e dividimos pelo tamanho do vetor,
+   de modo que o estado vira uma seta de **comprimento 1**.
+3. O **encoder** do SAE calcula um número para cada uma das 32.768 features:
+   $\text{pré}_j = (x - b_{dec}) \cdot W_{enc,j} + b_{enc,j}$.
+4. **TopK:** só as **32 maiores** sobrevivem (passando por ReLU, então ficam ≥ 0); as outras 32.736 viram 0.
+   O número que sobra para a feature $j$ é a **ativação** $z_j$.
+
+**Como interpretar a escala:** como a entrada tem comprimento 1 e cada direção do decoder $d_j$ também tem
+comprimento 1, a reconstrução é $\hat{x} = \sum_j z_j\, d_j + b_{dec}$ — ou seja, a ativação é **quanto da direção
+$d_j$ entra na soma**. Uma ativação de 0,16 significa, grosso modo, que a feature contribui com um "pedaço" de
+comprimento 0,16 num estado de comprimento 1 (aproximado, porque as direções das features não são perpendiculares
+entre si). Por isso os valores são pequenos (0 a ~0,4 na 19219) e **só fazem sentido comparados dentro da mesma
+feature** — 0,16 numa feature não é "a mesma força" que 0,16 em outra.
+
+**No gráfico do viewer:** cada claim tem uma ativação para a feature; agrupamos os claims em 10 faixas de ativação de
+mesma largura e mostramos, em cada faixa, a % de claims NEI. Os claims com ativação 0 (a feature não ficou entre as
+32 do TopK) ficam fora das barras e são contados no título do eixo. Na 19219: de 6% de NEI na faixa mais fraca a
+97% nas mais fortes; a partir de 0,16, 67% dos claims são NEI (37.933 de 56.699).
+
+> Código: `fcsae/sae/model.py` (`normalize_input`, `encode_pre`, `_topk`).
+""")
+
+md(r"""<a id="25"></a>
+## 25. Qual a diferença entre "feature" e "ativação"?
+
+- **Feature = o QUÊ.** Um "detector" fixo que o SAE aprendeu no treino: há 32.768, cada um com um número (19219,
+  14953…). É **o mesmo para todos os claims**: a mesma direção $d_j$ no espaço interno do modelo, o mesmo significado.
+- **Ativação = O QUANTO.** A leitura desse detector **num claim específico**, $z_j \geq 0$. Muda de claim para claim
+  (pergunta 24).
+
+**Analogia — mesa de som com 32.768 canais:** cada canal é uma feature (o canal 19219 é sempre o mesmo
+"instrumento"); o volume desse canal em cada música (cada claim) é a ativação. A cada momento, só 32 canais podem estar
+com volume acima de zero (TopK).
+
+| | feature 19219 |
+|---|---|
+| claim com evidência clara | ativação ≈ 0,02 (quase muda) |
+| claim sem evidência que decida | ativação ≈ 0,25 (forte) |
+| claim em que ela não entrou no TopK | ativação 0 |
+
+**No viewer:** a página é de uma **feature**; o gráfico mostra como a **ativação** dela varia entre os 598.930 claims
+(e quantos são NEI em cada faixa); "fires on 97,1% of answers" = ativação > 0 em 97,1% dos claims. O **steering**
+empurra a **direção da feature** no estado do modelo — como subir ou baixar o volume desse canal na mão.
+""")
+
+md(r"""<a id="26"></a>
+## 26. Como a ativação é medida a partir da direção? Como sei se ela é forte ou fraca?
+
+**1. A medida é uma projeção.** Para cada feature $j$, o encoder do SAE tem um vetor $w_j$ (4.096 números) — uma
+"régua" apontada numa direção. A ativação é o quanto o estado (normalizado) avança ao longo dessa régua:
+
+$$z_j = (x - b_{dec}) \cdot w_j + b_{enc,j}, \quad \text{depois ReLU e TopK (32 maiores)}$$
+
+Exemplo em 2 dimensões, estado $x = (0{,}8;\ 0{,}6)$:
+
+| régua da feature | conta | ativação |
+|---|---|---|
+| → (1; 0) | 0,8·1 + 0,6·0 | 0,8 (aponta bastante para lá) |
+| ↑ (0; 1) | 0,8·0 + 0,6·1 | 0,6 |
+| ← (−1; 0) | −0,8 → ReLU | 0 (aponta para o lado oposto) |
+
+Intuição: é a "sombra" do estado sobre a régua — longa se apontam para o mesmo lado, nula se apontam para lados
+opostos. Como o estado tem comprimento 1 (pergunta 24), os valores são pequenos.
+
+**2. Forte ou fraca é relativo à própria feature** — não há limiar universal. Na 19219 (Llama), entre os claims em
+que ela dispara:
+
+| ativação | posição |
+|---|---|
+| ≤ 0,069 | metade dos claims (mediana) — típica/fraca |
+| ≤ 0,158 | 90% dos claims |
+| > 0,256 | só o 1% mais forte |
+| 0,394 | máximo |
+
+No gráfico do viewer o eixo x vai do mínimo ao máximo **daquela** feature: quanto mais à direita, mais forte.
+
+> Código: `fcsae/sae/model.py` (`encode_pre`, `_topk`). Quantis calculados do `hist_by_label` do JSON da feature no
+> dataset do viewer.
+""")
+
+md(r"""<a id="27"></a>
+## 27. O que é, em detalhe, a "régua" de uma feature (o vetor do encoder)?
+
+A régua da feature $j$ é a **coluna $j$ da matriz do encoder** $W_{enc}$: 4.096 números, um por dimensão do estado.
+
+**1. É aprendida, não escrita.** O treino tem uma só tarefa: reconstruir o estado do modelo usando 32 features por vez.
+Para cada feature o gradiente ajusta duas setas: a **régua** $w_j$ (lê: "o quanto ela está presente?") e a **peça**
+$d_j$ (escreve: "o que somo de volta?"). A régua começa como cópia da peça (inicialização amarrada,
+`fcsae/sae/model.py`) e se ajusta. O **significado vem depois**, olhando em quais claims ela dá valores altos.
+
+**2. Nenhum número sozinho tem significado.** Na 19219 (Llama), as maiores componentes em módulo estão nas
+dimensões 1291 (−0,205), 1747 (−0,168), 772 (+0,145), mas as 50 maiores somam só **15%** do peso ($\sum w^2$): é
+um **padrão espalhado**, não um "neurônio da abstenção".
+
+**3. A conta completa:** (i) normaliza o estado (comprimento 1); (ii) produto escalar com a régua;
+(iii) soma o viés $b_{enc,19219} = -0{,}048$ (um "custo de entrada"); (iv) ReLU; (v) TopK — só as 32 maiores das
+32.768 ficam. O que sobra é a ativação.
+
+**4. Régua ≠ peça, e é normal.** $\cos(w_{19219}, d_{19219}) = 0{,}52$ (~58°); a mediana entre todas as 32.768
+features é **0,54** (percentil 10: 0,47). Como há 32.768 features em 4.096 dimensões, elas se sobrepõem; a régua
+aprende a apontar um pouco de lado para não confundir a feature com as vizinhas (analogia: o microfone que grava o
+violino é inclinado para longe do violoncelo ao lado).
+
+| | régua $w_j$ (encoder) | peça $d_j$ (decoder) |
+|---|---|---|
+| função | ler → ativação | escrever → o que a feature soma ao estado |
+| usada em | ativações, gráfico do viewer, AUC, Cohen's d | steering ($x \leftarrow x + \alpha d_j$), cosseno com a direção de abstenção (pergunta 23) |
+
+> Números: `checkpoints/v3_llama/sae.safetensors` (`W_enc[:, 19219]`, `b_enc[19219]`, `W_dec[19219]`).
+""")
+
+md(r"""<a id="28"></a>
+## 28. O que o steering da feature 12482 mostrou no Qwen3?
+
+Mesmo protocolo do Llama (500 claims do AVeriTeC dev; rótulo = `first_label`; α/R de −1 a +1; Iterative só até ±0,75
+— as doses ±1 ficaram pendentes, LEIA-ME #9). Porcentagem de cada veredito respondido:
+
+| α/R | Sem evidência (acc · SUP/REF/NEI) | Single (acc · SUP/REF/NEI) | Iterative (acc · SUP/REF/NEI) |
+|---|---|---|---|
+| −0,75 | 0,244 · 100/0/0 | 0,244 · 100/0/0 | 0,244 · 100/0/0 |
+| −0,50 | 0,244 · 100/0/0 | 0,272 · 96/4/0 | 0,300 · 93/7/0 |
+| −0,25 | 0,244 · 100/0/0 | 0,288 · 94/6/0 | 0,334 · 89/11/0 |
+| **0** | **0,450 · 0/70/30** | **0,400 · 13/30/57** | **0,452 · 22/37/42** |
+| +0,25 | 0,524 · 0/84/16 | 0,310 · 0/43/57 | 0,366 · 0/58/42 |
+| +0,50 | 0,556 · 0/89/11 | 0,362 · 0/49/51 | 0,398 · 0/62/38 |
+| +0,75 | 0,516 · 0/81/19 | 0,354 · 0/49/51 | 0,388 · 0/61/39 |
+
+**Leitura (preliminar):** diminuir a 12482 faz o modelo responder **SUPPORTED a quase tudo** — sem evidência, ele chega
+a escrever *"the task assumes that the evidence is sufficient to support the claim"*. Aumentar elimina o SUP, mas o NEI
+**não sobe** (com evidência fica em ~40–57%; sem evidência até cai): o que cresce é o REF. Ou seja, a 12482 parece
+codificar **"a evidência não sustenta a alegação"**, e não a abstenção em si — diferente da 19219 do Llama, que aumenta e
+diminui o NEI. Nenhuma dose supera o modelo sem intervenção em acurácia com evidência.
+
+**Cuidado com α/R = ±1:** só ~52% das respostas são coerentes em +1 (texto degenera; resposta sem rótulo vira NEI pela
+regra) — não interpretar o NEI dessas células.
+
+> Dados: `results/v3_qwen3_l22/steer_sae/`; viewer: página da feature 12482 (Qwen3-8B · layer 22), tabela por dose e
+> "browse all 500 claims".
+""")
+
+md(r"""<a id="29"></a>
+## 29. O que deu errado no treino do SAE do Gemma3 (perda "nan") e como foi corrigido?
+
+**O que aconteceu (11/10/2026).** A coleta das ativações do Gemma-3-4B (camada 19, 598.930 prompts) terminou sem erro,
+mas no treino do SAE a perda virou `nan` entre os passos 600 e 700 (FVU vinha caindo normalmente: 0,26 → 0,14).
+
+**Por quê.** O Gemma3 tem uma *massive activation* (Sun et al., 2024): a **dimensão 443** do resíduo vale ≈ 32.768 em
+**100% dos tokens** e sozinha responde por **98,8% da norma²** do vetor (as outras 2.559 dimensões ficam na casa das
+dezenas). As ativações eram gravadas em **float16**, cujo maior valor representável é **65.504**; o maior valor
+observado foi 50.432, e em alguns tokens (0 a 57 por shard de 500 mil) o valor passou do teto e virou `inf`. Um único
+`inf` num lote contamina a perda e os pesos → `nan`.
+
+| modelo (camada) | maior \|valor\| nas decisões | teto do float16 |
+|---|---|---|
+| Llama-3.1-8B (15) | 5,4 | 65.504 |
+| Qwen3-8B (22) | 88 | 65.504 |
+| **Gemma-3-4B (19)** | **50.432** (e `inf` em alguns tokens) | 65.504 |
+
+Llama e Qwen3 **não** foram afetados (além dos valores acima, os dois treinos terminaram com perda finita após duas
+passadas completas pelos dados). A **varredura de camadas** do Gemma3 também não: ela usa as ativações direto do
+modelo, sem passar pelo float16.
+
+**Como foi corrigido.** As ativações dos Gemma passaram a ser gravadas em **bfloat16** (`dtype_store="bfloat16"` nos
+presets `v3_gemma3`/`v3_gemma4`; `STORE_DTYPE` em `fcsae/harvest/harvest.py`). O bfloat16 é o formato em que o próprio
+modelo calcula (o `compute_dtype` da quantização nf4), vai até ~10³⁸ e, portanto, não estoura nem perde informação em
+relação ao que o modelo produz. Todas as etapas que leem as ativações já convertiam para float32 antes de calcular;
+Llama, Qwen3 e DeepSeek continuam em float16 (sem mudança). Teste com 400 prompts: 0 valores não finitos e treino
+finito. A coleta em float16 (589 GB) e o checkpoint corrompido foram apagados, e o ciclo foi relançado (~15 h de
+coleta + treino).
+
+**Ponto em aberto para o steering dos Gemma.** A dose é α/R, com R = norma média do resíduo na decisão. No Gemma3 essa
+norma (~33.000) é quase toda da dimensão 443, que é praticamente constante; α/R no Gemma não seria comparável ao dos
+outros modelos. A forma de calcular R para os Gemma será decidida antes do steering.
+""")
+
+md(r"""<a id="30"></a>
+## 30. "Ativação" do modelo × ativação de uma feature: de onde até onde vai cada número?
+
+A palavra "ativação" é usada em dois sentidos neste projeto:
+
+**1. Ativação do modelo (resíduo).** O estado interno num token: um **vetor** (2.560 números no Gemma3; 4.096 no
+Llama/Qwen3/DeepSeek). Cada número é real (positivo ou negativo) e **não tem faixa fixa**: o resíduo é uma **soma** —
+cada camada soma sua contribuição ao vetor da camada anterior (conexão residual) — e nenhuma função o "aperta" (as
+normalizações RMSNorm só normalizam a *entrada* de cada subcamada). Por isso os valores crescem com a profundidade
+(Llama: norma média 0,77 na camada 0 → 139 na última). Faixa observada nas posições de decisão:
+
+| modelo (camada) | maior \|valor\| |
+|---|---|
+| Llama (15) | 5,4 |
+| Qwen3 (22) | 88 |
+| Gemma3 (19) | dezenas na maioria das dimensões; **dim. 443 ≈ 32.768** (até 50.432) — *massive activation* |
+
+Foi um desses números (Gemma3, dim. 443) que passou do teto do float16 (65.504) e virou `inf` (pergunta 29).
+
+**2. Ativação de uma feature do SAE.** Um **único número ≥ 0** por feature (pergunta 24), pequeno (0 a ~0,4 na
+19219), porque o SAE recebe o resíduo **normalizado** para comprimento 1. Não corre risco de estourar.
+
+**Relação:** modelo → resíduo (vetor sem limite) → normalização → SAE → ativações das features (≥ 0, pequenas).
+""")
+
+md(r"""<a id="31"></a>
+## 31. Por que a dose do steering passou a usar a norma centrada ($R_c$) e não a norma média?
+
+A dose é $\alpha/R$: o deslocamento $\alpha$ (a direção da feature tem comprimento 1) dividido por uma escala $R$ do
+resíduo na posição de decisão. Até o Qwen3 usávamos a **norma média**, $\mathbb{E}\lVert x\rVert$. Ela mistura a parte
+do vetor que é **igual em todas as alegações** (a média $\mu$, que não diz nada sobre a alegação) com a **variação**
+entre alegações. No Gemma3 a parte comum é enorme (dim. 443 ≈ 32.768, *massive activations*; Sun et al., 2024), e
+$\alpha/R$ com a norma média empurraria o Gemma3 muito mais, em relação à sua variação real, do que os outros modelos.
+
+**Decisão (Lucas, 12/10/2026):** $R_c = \frac{1}{N}\sum_i \lVert x_i - \mu\rVert$ para todos os modelos.
+
+| modelo | norma média | $R_c$ | razão |
+|---|---|---|---|
+| Llama (15) | 8,38 | 1,60 | 5,2 |
+| Qwen3 (22) | 131,81 | 22,70 | 5,8 |
+| Gemma3 (19) | 32.958 | 839 | 39,3 |
+
+Llama e Qwen3 foram rodados com a norma média (−1 a +1); a conversão é exata (×5,2 e ×5,8), sem refazer nada. Gemma3:
+grade 0, ±1,5, ±3, ±4,5, ±6 em $\alpha/R_c$. Texto na dissertação: Metodologia, seção de Activation Steering
+(Tabela `tab:steering_scale`). Código: `residual_norm(cfg, kind)` e `--norm centered` em `fcsae/steering/factcheck_sae.py`.
 """)
 
 nb = new_notebook(cells=cells, metadata={

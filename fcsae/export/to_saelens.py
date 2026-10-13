@@ -91,9 +91,9 @@ fact-checking verdict prompts, to study the model's **abstention** ("NOT ENOUGH 
 | | |
 |---|---|
 | architecture | **TopK** SAE, exact L0 = **k = {k}**; `d_in` = {d_in}, `d_sae` = {d_sae} |
-| auxiliary loss | AuxK, α = 1/32, k_aux = {k_aux}; dead-latent threshold ≈ 10M tokens |
+| auxiliary loss | AuxK, α = 1/32, k_aux = {k_aux}; dead-feature threshold ≈ 10M tokens |
 | optimization | Adam (lr {lr}, ε = 6.25e-10), gradient projection parallel to decoder rows, geometric-median b_pre init, weight EMA 0.999 (Gao et al., App. A) |
-| input normalization | mean-subtracted and unit-normed over `d_model` (Gao et al., §2.1) — exported as `normalize_activations="layer_norm"` with weights rescaled by √(d_in−1). sae_lens adds ε = 1e-5 to the std, which changes one of the 32 active latents on ~0.1% of tokens (near-ties); reconstruction FVU is identical to 5 decimals (see `export_verification.json`) |
+| input normalization | mean-subtracted and unit-normed over `d_model` (Gao et al., §2.1) — exported as `normalize_activations="layer_norm"` with weights rescaled by √(d_in−1). sae_lens adds ε = 1e-5 to the std, which changes one of the 32 active features on ~0.1% of tokens (near-ties); reconstruction FVU is identical to 5 decimals (see `export_verification.json`) |
 | batch | 2,048 tokens (Gao et al. use 131,072; their §A.4 reports L(N) is not strongly batch-dependent) |
 | training data | {n_prompts:,} claims from VitaminC + FEVER (gold evidence) rendered in a verdict prompt → {n_tokens:,} token activations |
 | base-model precision | activations collected from the model loaded in **4-bit NF4** (bitsandbytes) |
@@ -101,7 +101,7 @@ fact-checking verdict prompts, to study the model's **abstention** ("NOT ENOUGH 
 ## Metrics
 | | |
 |---|---|
-| dead latents (end of training) | {dead} / {d_sae} |
+| dead features (end of training) | {dead} / {d_sae} |
 | FVU held-out (normalized space) | {fvu:.3f} |
 | FVU at the decision position (raw space, variance across decisions) | {fvu_dec_raw} |
 | L0 | {l0:.1f} |
@@ -109,7 +109,7 @@ fact-checking verdict prompts, to study the model's **abstention** ("NOT ENOUGH 
 ## Abstention feature
 {feat_block}
 
-## Browse the latents
+## Browse the features
 Interactive viewer: [lucasfrag/fact-checking-abstention-saes-viewer](https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer).
 
 ## Usage
@@ -127,6 +127,9 @@ feats = sae.encode(resid)          # resid: [..., {d_in}] raw residual stream
 ## References
 - Gao, L., et al. (2024). *Scaling and Evaluating Sparse Autoencoders.* [arXiv:2406.04093](https://arxiv.org/abs/2406.04093)
 - Ferrando, J., et al. (2025). *Do I Know This Entity? Knowledge Awareness and Hallucinations in Language Models.* ICLR 2025. [arXiv:2411.14257](https://arxiv.org/abs/2411.14257)
+- Bricken, T., et al. (2023). *Towards Monosemanticity: Decomposing Language Models With Dictionary Learning.* Transformer Circuits Thread. [link](https://transformer-circuits.pub/2023/monosemantic-features/index.html)
+- Chanin, D., et al. (2024). *A is for Absorption: Studying Feature Splitting and Absorption in Sparse Autoencoders.* [arXiv:2409.14507](https://arxiv.org/abs/2409.14507)
+- Paulo, G., & Belrose, N. (2025). *Sparse Autoencoders Trained on the Same Data Learn Different Features.* [arXiv:2501.16615](https://arxiv.org/abs/2501.16615)
 """
 
 
@@ -214,9 +217,15 @@ def run(preset_name: str, out_dir: str | None, verify: bool, feat: int | None, n
             with torch.no_grad():
                 xln0 = xc / xc.std(dim=-1, keepdim=True)
                 pre0 = (xln0 - export_w["b_dec"]) @ export_w["W_enc"] + export_w["b_enc"]
-                z0 = torch.zeros_like(pre0).scatter_(-1, pre0.topk(cfg.sae_k, dim=-1).indices, 1.0)
+                v0, i0 = pre0.topk(cfg.sae_k, dim=-1)        # com ReLU, como o SAE: uma das top-k pode ser ≤ 0
+                z0 = torch.zeros_like(pre0).scatter_(-1, i0, torch.relu(v0))
             report["same_active_set_without_saelens_eps"] = ((z > 0) == (z0 > 0)).all(dim=-1).float().mean().item()
-            ok = report["same_active_set_without_saelens_eps"] == 1.0 and abs(report["fvu_ours"] - report["fvu_saelens"]) < 1e-4
+            # tolera empates numéricos na fronteira do top-k (Gemma3: 1 em 20.000 linhas, folga 32ª–33ª ≈ 1e-9; nosso próprio
+            # SAE em float32 × float64 discorda na mesma linha) — exige ≥ 99,99% das linhas iguais e FVU igual até 1e-4
+            ok = report["same_active_set_without_saelens_eps"] >= 0.9999 and abs(report["fvu_ours"] - report["fvu_saelens"]) < 1e-4
+            if ok and report["same_active_set_without_saelens_eps"] < 1.0:
+                report["note"] = ("rows with a different active set are top-k near-ties (gap between the 32nd and 33rd "
+                                  "pre-activation ~1e-9); our own SAE in float32 vs float64 differs on the same rows")
         else:
             ok = same_set > 0.999 and rel < 1e-3
         print(f"VERIFICAÇÃO ({src}): mesmo conjunto de features ativas em {same_set:.4%} | "
@@ -236,14 +245,43 @@ def run(preset_name: str, out_dir: str | None, verify: bool, feat: int | None, n
         fvu_dec_raw = f"{json.load(open(abst))['fvu_decision_domainSAE']:.3f}" if os.path.exists(abst) else "n/a"
         if feat is not None and os.path.exists(fex):
             fe = json.load(open(fex))
-            feat_block = (f"Latent **{feat}** is the candidate abstention feature: it is the latent most aligned with the "
-                          f"diff-of-means abstention direction and the one with the largest Cohen's d between NEI and "
-                          f"SUP/REF decisions. Among the 200 claims that activate it most, **{100*fe['nei_top200']:.1f}%** "
+            # posição real nos dois rankings (Llama/Qwen3: 1ª em ambos; Gemma3: 1ª no cosseno e no d positivo, 2ª no |d|)
+            ab = json.load(open(abst)) if os.path.exists(abst) else {}
+            cos_rank = [x["feat"] for x in ab.get("top_decoder_cos", [])]
+            d_rank = [x["feat"] for x in ab.get("top_feats_cohens_d", [])]
+            d_pos = [x["feat"] for x in ab.get("top_feats_cohens_d", []) if x["d"] > 0]
+            why = []
+            if cos_rank[:1] == [feat]:
+                why.append("the feature most aligned with the diff-of-means abstention direction")
+            if d_rank[:1] == [feat]:
+                why.append("the one with the largest Cohen's d between NEI and SUP/REF decisions")
+            elif d_pos[:1] == [feat]:
+                why.append(f"the one with the largest positive Cohen's d between NEI and SUP/REF decisions (the largest |d|, "
+                           f"feature {d_rank[0]}, is negative: it fires more on SUP/REF)")
+            why_txt = " and ".join(why) if why else "selected by Cohen's d and cosine with the abstention direction"
+            feat_block = (f"Feature **{feat}** is the candidate abstention feature: it is {why_txt}. Among the 200 claims that activate it most, **{100*fe['nei_top200']:.1f}%** "
                           f"are NEI (base rate {100*fe['nei_base']:.1f}%; {fe['enrich_top200']:.1f}×); AUC(NEI vs. "
                           f"SUP/REF) = {fe['auc_feature_topk']:.3f}. Its **magnitude** (not on/off) encodes abstention: it is "
                           f"active on {100*fe['frac_active']:.0f}% of decision positions.")
         else:
             feat_block = "See the accompanying repository."
+        spf = os.path.join(cfg.paths()["results"], "spread.json")          # fcsae/analysis/spread.py
+        if os.path.exists(spf):
+            sp = json.load(open(spf)); a, cv = sp["auc_by_k"], sp["direction_coverage_by_k"]
+            spread = cv["1"] < 0.5
+            feat_block += (
+                "\n\n**How concentrated is abstention in this SAE?** Separation of NEI vs. SUP/REF (held-out AUC of a logistic "
+                "probe) using only the k features with the largest |Cohen's d|, and the fraction of the diff-of-means abstention "
+                "direction covered by the k most aligned decoder rows:\n\n"
+                "| k features | 1 | 5 | 10 | all |\n|---|---|---|---|---|\n"
+                f"| AUC | {a['1']:.3f} | {a['5']:.3f} | {a['10']:.3f} | {sp['auc_all_features']:.3f} |\n"
+                f"| direction coverage | {cv['1']:.0%} | {cv['5']:.0%} | {cv['10']:.0%} | — |\n\n"
+                + ("In this SAE abstention is **spread over several features** (the top features by |d| are "
+                   + ", ".join(f"{f} ({d:+.2f})" for f, d in sp["top_features_by_abs_d"][:5])
+                   + "; positive d = stronger on NEI) rather than concentrated in one. Feature splitting/absorption "
+                   "(Bricken et al., 2023; Chanin et al., 2024) and seed dependence (Paulo & Belrose, 2025) can produce "
+                   "this, so it should not be read as a property of the base model alone."
+                   if spread else "A single feature already captures most of the signal."))
         card = MODEL_CARD_V3.format(
             base=base, base_short=base.split("/")[-1], layer=cfg.layer, hook=hook, k=cfg.sae_k,
             k_aux=cfg.sae_k_aux, d_in=d_in, d_sae=d_sae, lr=cfg.sae_lr, n_prompts=man["dom_prompts"],

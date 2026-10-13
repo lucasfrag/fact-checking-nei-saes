@@ -5,7 +5,7 @@
 
 We train **TopK sparse autoencoders** (following Gao et al., 2024) on the residual stream of
 instruction-tuned LLMs *while they read fact-checking verdict prompts* (claim + evidence + instructions),
-locate the latent that encodes abstention at the decision position, check what it responds to, and
+locate the feature that encodes abstention at the decision position, check what it responds to, and
 **manipulate it** during the verdict (activation steering) to test whether it causally controls abstention
 and whether suppressing it improves fact-checking on AVeriTeC.
 
@@ -13,12 +13,11 @@ and whether suppressing it improves fact-checking on AVeriTeC.
 |---|---|
 | 🤗 **SAE weights** (SAELens format, one folder per model/layer) | [`lucasfrag/fact-checking-abstention-saes`](https://huggingface.co/lucasfrag/fact-checking-abstention-saes) |
 | 🤗 **Data** (ordered training claims + decision-position activations) | [`lucasfrag/fact-checking-abstention-saes-data`](https://huggingface.co/datasets/lucasfrag/fact-checking-abstention-saes-data) |
-| 🔎 **SAE viewer** (browse every latent: top claims, label histograms, logit effects) | [`lucasfrag/fact-checking-abstention-saes-viewer`](https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer) |
+| 🔎 **SAE viewer** (browse every feature: top claims, label histograms, logit effects) | [`lucasfrag/fact-checking-abstention-saes-viewer`](https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer) |
 | Fact-checking pipeline (Single-step vs. Iterative question generation) | [`lucasfrag/iterative-question-generation`](https://github.com/lucasfrag/iterative-question-generation) |
 
-Part of an MSc dissertation (PPGCC/PUCRS). Status: **work in progress** — the Llama-3.1-8B SAE is
-released; SAEs for the other models of the Single-step vs. Iterative study (DeepSeek-R1-Distill-Llama-8B,
-Qwen3-8B, Gemma-3-4B-it, Gemma-4-E4B-it, Ministral-3-8B-Instruct) are being trained.
+Part of an MSc dissertation (PPGCC/PUCRS). Status: **work in progress** — the Llama-3.1-8B SAE is released; SAEs for the other models of the Single-step vs. Iterative study
+(DeepSeek-R1-Distill-Llama-8B, being redone from scratch; Qwen3-8B, Gemma-3-4B-it, Gemma-4-E4B-it, Ministral-3-8B-Instruct) are being trained.
 
 ---
 
@@ -27,22 +26,24 @@ Qwen3-8B, Gemma-3-4B-it, Gemma-4-E4B-it, Ministral-3-8B-Instruct) are being trai
 Off-the-shelf SAEs (Gemma Scope, Llama Scope, …) reconstruct the **verdict-decision position** (the last
 prompt token, where the model commits to SUPPORTED / REFUTED / NOT ENOUGH EVIDENCE) poorly: it is out
 of their training distribution. Training the SAE on the task distribution itself puts the decision
-position in-distribution, so the abstention mechanism can be read off the SAE's latents.
+position in-distribution, so the abstention mechanism can be read off the SAE's features.
 
 ## Released SAEs
 
-| base model | layer | d_sae | k | dead latents | FVU at decision | abstention latent |
+| base model | layer | d_sae | k | dead features | FVU at decision | abstention feature |
 |---|---|---|---|---|---|---|
 | `meta-llama/Llama-3.1-8B-Instruct` | 15 | 32,768 | 32 | 2 | 0.234 | **19219** |
-| `deepseek-ai/DeepSeek-R1-Distill-Llama-8B` | 15 | | | | | *in progress* |
-| `Qwen/Qwen3-8B` | 19 | | | | | *in progress* |
+| `deepseek-ai/DeepSeek-R1-Distill-Llama-8B` | *tbd* | | | | | *being redone* |
+| `Qwen/Qwen3-8B` | 22 | | | | | *in progress* |
 | `google/gemma-3-4b-it` | *tbd* | | | | | *planned* |
 | `google/gemma-4-E4B-it` | *tbd* | | | | | *planned* |
 | `mistralai/Ministral-3-8B-Instruct-2512` | *tbd* | | | | | *planned* |
 
-Latent 19219 (Llama): 93.5% of the 200 claims that activate it most are NEI (4.7× the base rate);
+Feature 19219 (Llama): 93.5% of the 200 claims that activate it most are NEI (4.7× the base rate);
 AUC (NEI vs. SUP/REF) = 0.783; its **magnitude** (not on/off) encodes abstention.
-Browse it in the viewer: [latent 19219](https://lucasfrag-fact-checking-abstention-saes-viewer.static.hf.space/#/model/fact-checking/family/fc_topk_32k/model/llama-3.1-8b-instruct/feature/19219).
+Browse it in the viewer: [feature 19219](https://lucasfrag-fact-checking-abstention-saes-viewer.static.hf.space/#/model/fact-checking/family/fc_topk_32k/model/llama-3.1-8b-instruct/feature/19219).
+
+DeepSeek: the first SAE (layer 15) is being redone from scratch, starting from a new layer sweep.
 
 ```python
 from huggingface_hub import snapshot_download
@@ -66,7 +67,7 @@ fcsae/                    the package
   analysis/               abstention analysis, feature inspection, layer sweep, generalization
   steering/factcheck_sae.py  feature steering in the verdict step (faithful replay of the pipeline prompt)
   export/to_saelens.py    export to SAELens format, with verification
-  analysis/viewer_data.py per-latent JSONs for the SAE viewer
+  analysis/viewer_data.py per-feature JSONs for the SAE viewer
 viewer/                   SAE viewer (adapted from OpenAI's sae-viewer, MIT), deployed as a static HF Space
 scripts/                  long-running wrappers with watchdog + auto-restart (run_v3.sh, run_steer_sae.sh)
 notebooks/                analysis notebooks (NN-name.ipynb) and their builders (build_NN_name.py)
@@ -102,10 +103,10 @@ export FCSAE_STORE=/path/to/large/disk      # activations, checkpoints and resul
 # 1–3. harvest (≈1 TB, ~30 h) → train the SAE (~17 h) → abstention analysis, with watchdog/resume
 bash scripts/run_v3.sh v3_llama
 
-# 4. semantic validation of the abstention latent (uses the cached decision activations)
+# 4. semantic validation of the abstention feature (uses the cached decision activations)
 python -m fcsae.analysis.inspect_feature --preset v3_llama --feat 19219
 
-# 5. steering in the verdict step: 3 evidence conditions × α grid (+ random-latent control)
+# 5. steering in the verdict step: 3 evidence conditions × α grid (+ random-feature control)
 bash scripts/run_steer_sae.sh steer --preset v3_llama --feat 19219 \
      --conds none,single,iterative --betas=0,-0.25,0.25,-0.5,0.5,-0.75,0.75,-1,1
 bash scripts/run_steer_sae.sh steer_rand --preset v3_llama --feat 19219 --random 10 --split test --n 100 --betas=<chosen>
@@ -122,11 +123,11 @@ so regenerated activations are bit-identical given the same environment.
 
 ## Notes on methodology
 
-- **SAE training** follows Gao et al. (2024): TopK (k=32), 32,768 latents, AuxK, input normalization,
+- **SAE training** follows Gao et al. (2024): TopK (k=32), 32,768 features, AuxK, input normalization,
   normalized losses, small Adam ε, decoder-gradient projection, geometric-median init and weight EMA.
   The only deviation is the batch size (2,048 tokens), discussed in `notebooks/02-sae-v3.ipynb` §3.
-- **Steering** follows Ferrando et al. (2025, Eq. 4): `x ← x + α·d_j` with the latent's decoder direction,
-  α reported in multiples of the residual-stream norm; random-latent control as in their work.
+- **Steering** follows Ferrando et al. (2025, Eq. 4): `x ← x + α·d_j` with the feature's decoder direction,
+  α reported in multiples of the residual-stream norm; random-feature control as in their work.
 - **Verdict parsing.** The original pipeline's label parser (`LLMVerdict.normalize`) checks for "REFUTE"/"FALSE"
   anywhere in the response before "NOT ENOUGH", so answers such as *"NOT ENOUGH EVIDENCE — the evidence does
   not support or refute the claim"* are recorded as REFUTED. Our steering analysis uses the label the model

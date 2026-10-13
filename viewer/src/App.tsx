@@ -4,6 +4,7 @@ import React from "react"
 import { Routes, Route, HashRouter } from "react-router-dom"
 import { AUTOENCODER_FAMILIES } from "./autoencoder_registry"
 import Welcome from "./welcome"
+import SteeringBrowser from "./components/steeringBrowser"
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Welcome />} />
         <Route path="/feature/:atom" element={<Feed />} />
+        <Route path="/steering/:model/:atom" element={<SteeringBrowser />} />
         {
           Object.values(AUTOENCODER_FAMILIES).map((family) => {
             let extra = '';

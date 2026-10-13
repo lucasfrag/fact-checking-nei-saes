@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import { SteeringInfo } from '../types'
 
@@ -8,7 +9,6 @@ const METRICS: [string, string, string][] = [
   ['acc', 'Accuracy', '4-label accuracy against the AVeriTeC gold label'],
   ['macro_f1', 'Macro-F1', 'mean F1 of SUPPORTED, REFUTED and NOT ENOUGH EVIDENCE'],
   ['err_non_nei', 'Error outside NEI', 'error rate among the claims the model did NOT abstain on'],
-  ['coherent', 'Coherent output', 'share of answers that still contain a label or a lack-of-evidence refusal'],
   ['hit_cap', 'Looping output', 'share of answers that run until the generation limit (1,536 tokens) without finishing, usually a repetition loop'],
 ]
 const LABEL_COLORS: {[key: string]: string} = {NEI: '#f0883e', SUP: '#2a9d5c', REF: '#d9534f', CONF: '#7a5cc4'}
@@ -19,8 +19,38 @@ const Badge = ({label}: {label: string}) => (
 const tab = (on: boolean) => on ? {background: '#dbeafe', borderColor: '#2a78d6', borderWidth: 2, fontWeight: 700}
                                 : {background: '#ffffff'}
 const fmt = (b: number) => (b > 0 ? '+' : '') + b.toFixed(2)
+const DIST_LABELS = ['SUP', 'REF', 'NEI', 'CONF']
 
-export default function SteeringPanel({data}: {data: SteeringInfo}) {
+// "What the model answered at each dose": accuracy and the share of each label, one row per α/R (plus the gold answers).
+const DistCell = ({v, label}: {v: number, label: string}) => (
+  <td className="px-2" style={{whiteSpace: 'nowrap'}}>
+    <span style={{display: 'inline-block', width: 60, height: 8, background: '#eee', borderRadius: 4, marginRight: 6, verticalAlign: 'middle'}}>
+      <span style={{display: 'block', width: 60 * v, height: 8, borderRadius: 4, background: LABEL_COLORS[label]}}/>
+    </span>
+    <span style={{fontWeight: v >= 0.5 ? 700 : 400, color: v === 0 ? '#bbb' : undefined}}>{(100 * v).toFixed(1)}%</span>
+  </td>)
+
+const DistTable = ({points}: {points: SteeringInfo['curves'][string]}) => {
+  if (!points.length || !points[0].dist) return null
+  return (
+    <table className="text-sm mb-1" style={{borderCollapse: 'collapse'}}>
+      <thead><tr style={{borderBottom: '1px solid #999'}}>
+        <th className="px-2 text-left" title="dose: α/R < 0 decreases the feature, > 0 increases it">α/R</th>
+        <th className="px-2 text-left" title="share of claims whose verdict matches the AVeriTeC gold label">accuracy</th>
+        {DIST_LABELS.map((l) => <th key={l} className="px-2 text-left" title="share of claims that received this verdict"><Badge label={l}/></th>)}
+      </tr></thead>
+      <tbody>
+        {points.map((p) => (
+          <tr key={p.alpha_over_R} style={{borderBottom: '1px solid #f0f0f0', background: p.alpha_over_R === 0 ? '#f3f3f3' : undefined}}>
+            <td className="px-2">{fmt(p.alpha_over_R)}{p.alpha_over_R === 0 ? ' (none)' : ''}</td>
+            <td className="px-2">{p.acc.toFixed(3)}</td>
+            {DIST_LABELS.map((l) => <DistCell key={l} v={p.dist![l] || 0} label={l}/>)}
+          </tr>))}
+      </tbody>
+    </table>)
+}
+
+export default function SteeringPanel({data, path}: {data: SteeringInfo, path: string}) {
   const [metric, setMetric] = useState('nei_rate')
   const conds = Object.keys(data.curves)
   const [cond, setCond] = useState(conds.includes('single') ? 'single' : conds[0])
@@ -48,8 +78,9 @@ export default function SteeringPanel({data}: {data: SteeringInfo}) {
         verdict on {data.n_claims} claims of the {data.dataset}, we add α times the feature's decoder direction to the residual
         stream at layer {data.layer} (every position; Ferrando et al., 2025, Eq. 4). α is shown as <b>α/R</b>, where
         R = {data.R.toFixed(2)} is the typical residual norm at the verdict position: <b>α/R &lt; 0 decreases</b> the feature,
-        <b> α/R &gt; 0 increases</b> it, α/R = 0 is the unmodified model. Conditions: <b>No evidence</b> (claim only),
-        <b> Single-step</b> and <b>Iterative</b> (the evidence retrieved by each question-generation method).
+        <b> α/R &gt; 0 increases</b> it, α/R = 0 is the unmodified model. {conds.length > 1
+          ? <>Conditions: <b>No evidence</b> (claim only), <b>Single-step</b> and <b>Iterative</b> (the evidence retrieved by each question-generation method).</>
+          : <>Only the <b>no-evidence</b> condition (claim only) has been run for this feature so far{data.curves[conds[0]].length < 9 ? ', and only some doses' : ''}.</>}
         The verdict is the first full label the model writes (NEI if none).
       </div>
       <div className="mb-1">
@@ -64,7 +95,20 @@ export default function SteeringPanel({data}: {data: SteeringInfo}) {
           config={{displayModeBar: false}}/>
       </div>
 
-      <h4 className="text-md font-bold mt-3 mb-1">Examples: the same claim at every dose</h4>
+      <h4 className="text-md font-bold mt-3 mb-1">What the model answered at each dose</h4>
+      <div className="mb-2 text-sm">
+        {conds.map((c) => (
+          <button key={c} onClick={() => { setCond(c); setExIdx(0) }}
+            className="rounded-md px-2 py-1 mr-2 border border-gray-300" style={tab(cond === c)}>
+            {data.conditions[c]}</button>))}
+      </div>
+      <p className="text-xs text-gray-500 mb-1">Accuracy and the share of the {data.n_claims} claims that received each verdict, for the
+        condition selected above.</p>
+      <DistTable points={data.curves[cond] || []}/>
+
+      <h4 className="text-md font-bold mt-3 mb-1">Examples: the same claim at every dose
+        <Link to={`/steering/${path.split('/')[0]}/${data.feature}`} className="text-sm font-normal ml-3"
+          style={{color: '#2a78d6'}}>browse all {data.n_claims} claims →</Link></h4>
       <div className="mb-2 text-sm">
         {conds.map((c) => (
           <button key={c} onClick={() => { setCond(c); setExIdx(0) }}

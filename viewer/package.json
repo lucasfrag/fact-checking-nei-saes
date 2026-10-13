@@ -20,7 +20,7 @@
   },
   "scripts": {
     "start": "rm -rf dist && rm -rf .parcel-cache && parcel src/index.html",
-    "build": "parcel build src/index.html --public-url ./",
+    "build": "parcel build src/index.html --public-url ./ --no-source-maps",
     "serve": "parcel serve src/index.html",
     "typecheck": "tsc -p ."
   },

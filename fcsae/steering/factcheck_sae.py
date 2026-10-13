@@ -37,6 +37,7 @@ from safetensors.torch import load_file
 
 from fcsae.config import preset, Config, ROOT
 from fcsae.common.modeling import load_model
+from fcsae.data.prompt import apply_empty_think
 
 OUT = os.path.join(ROOT, "old_method/corpora/averitec/outputs")
 EV_DIR = {"single": "averitec_original_pipeline", "iterative": "averitec_iterative_pipeline"}
@@ -257,16 +258,71 @@ def directions(cfg, feat, n_random, seed=0):
     return dirs
 
 
-def residual_norm(cfg):
-    """R = norma média do resíduo (bruto) na posição da decisão, camada do SAE."""
-    cache = os.path.join(cfg.paths()["results"], "residual_norm_decision.json")
+def abstention_direction(cfg):
+    """Direção de abstenção (diff-of-means, sem SAE): média do resíduo bruto na posição da decisão nos claims
+    NEI menos a média nos SUP/REF, na metade de TREINO (índice par entre as decisões NEI/SUP/REF) — a mesma
+    direção de `fcsae/analysis/abstention.py` [Arditi et al. 2024; Panickssery et al. 2024 (CAA)]; norma 1,
+    para ser usada exatamente como a linha do decoder de uma feature (x <- x + α·d). Cacheada em
+    results/<preset>/abstention_direction.safetensors (com a AUC held-out, para conferir com abstention.json)."""
+    from safetensors.torch import save_file
+    cache = os.path.join(cfg.paths()["results"], "abstention_direction.safetensors")
     if os.path.exists(cache):
-        return json.load(open(cache))["R"]
+        return load_file(cache)["v"]
     t = load_file(os.path.join(cfg.paths()["activations"], "decisions.safetensors"))
-    R = float(t["acts"].float().norm(dim=1).mean())
+    H, lab = t["acts"], t["label"]
+    keep = (lab == 0) | (lab == 1) | (lab == 2)
+    H, ab = H[keep], (lab[keep] == 2)
+    tr = torch.arange(len(ab)) % 2 == 0
+    mu1 = torch.zeros(H.shape[1], dtype=torch.float64); mu0 = torch.zeros_like(mu1); n1 = n0 = 0
+    for i in range(0, len(H), 65536):                      # em blocos (H inteiro em fp32 não cabe com folga)
+        h = H[i:i + 65536].double(); a = ab[i:i + 65536]; m = tr[i:i + 65536]
+        mu1 += h[a & m].sum(0); n1 += int((a & m).sum()); mu0 += h[~a & m].sum(0); n0 += int((~a & m).sum())
+    v = (mu1 / n1 - mu0 / n0).float(); v = v / v.norm()
+    proj = torch.cat([(H[i:i + 65536].float() @ v) for i in range(0, len(H), 65536)])
+    te = ~tr
+    from fcsae.analysis.abstention import auc
+    a_te = float(auc(proj[te & ab].numpy(), proj[te & ~ab].numpy()))
     os.makedirs(cfg.paths()["results"], exist_ok=True)
-    json.dump({"R": R, "n": int(t["acts"].shape[0])}, open(cache, "w"))
-    return R
+    save_file({"v": v, "auc_heldout": torch.tensor(a_te)}, cache)
+    print(f"direção de abstenção: AUC held-out = {a_te:.3f} (n_treino NEI={n1}, decidido={n0})", flush=True)
+    return v
+
+
+def residual_norm(cfg, kind="raw"):
+    """Escala do resíduo na posição da decisão (camada do SAE), usada para expressar a dose como α/R.
+    kind="raw": R = norma média do resíduo bruto, E‖x‖ (Llama e Qwen3 foram rodados assim).
+    kind="centered": R_c = E‖x − μ‖, μ = média das decisões — o tamanho típico da VARIAÇÃO do resíduo entre claims.
+    Decisão do Lucas (12/10/2026): R_c para todos os modelos — no Gemma3 uma dimensão quase constante (~32.768) infla
+    E‖x‖ (razão E‖x‖/R_c ≈ 42, contra ≈ 6 no Llama/Qwen3), e α/R bruto não seria comparável entre modelos."""
+    cache = os.path.join(cfg.paths()["results"], "residual_norm_decision.json")
+    c = json.load(open(cache)) if os.path.exists(cache) else {}
+    if "R" not in c or "R_centered" not in c:
+        t = load_file(os.path.join(cfg.paths()["activations"], "decisions.safetensors"))
+        A = t["acts"]; n = A.shape[0]
+        mu = torch.zeros(A.shape[1], dtype=torch.float64); r = rc = 0.0
+        for i in range(0, n, 65536):
+            mu += A[i:i + 65536].double().sum(0)
+        mu /= n
+        for i in range(0, n, 65536):
+            x = A[i:i + 65536].double()
+            r += float(x.norm(dim=1).sum()); rc += float((x - mu).norm(dim=1).sum())
+        c = {"R": r / n, "R_centered": rc / n, "n": int(n)}
+        os.makedirs(cfg.paths()["results"], exist_ok=True)
+        json.dump(c, open(cache, "w"))
+    return c["R_centered"] if kind == "centered" else c["R"]
+
+
+def decoder_layers(model):
+    """Lista de blocos do transformer (Llama/Qwen3: model.model.layers; Gemma multimodal: ...language_model.layers)."""
+    for path in ("model.layers", "model.language_model.layers", "language_model.model.layers", "model.language_model.model.layers"):
+        obj = model
+        try:
+            for a in path.split("."):
+                obj = getattr(obj, a)
+            return obj
+        except AttributeError:
+            continue
+    raise AttributeError("camadas do transformer não encontradas")
 
 
 @torch.no_grad()
@@ -275,6 +331,8 @@ def run(args):
     # re-gera as respostas para reler o rótulo com `first_label` (defeito do `normalize`, nb01 §7)
     replay = args.replay
     cfg = Config(name=f"replay_{HF_TAG[replay]}", model_tag=replay) if replay else preset(args.preset)
+    if replay and args.empty_think:      # RQ1 parelho com o SAE do DeepSeek sem raciocínio (Lucas, 09/10/2026)
+        cfg.empty_think = True
     dev = cfg.device
     if replay:
         args.betas, args.conds, args.random = "0", "single,iterative", 0
@@ -288,26 +346,34 @@ def run(args):
     if args.n:
         claims = claims[:args.n]
     tag = "" if (args.split == "all" and not args.n) else f"__{args.split}{args.n or len(claims)}"
-    R = None if replay else residual_norm(cfg)
-    dirs = {"none": None} if replay else directions(cfg, args.feat, args.random)
+    R = None if replay else residual_norm(cfg, args.norm)
+    if replay:
+        dirs = {"none": None}
+    elif args.direction == "abstention":                 # diff-of-means, sem SAE (comparação com a feature)
+        dirs = {"dirabst": abstention_direction(cfg)}
+    else:
+        dirs = directions(cfg, args.feat, args.random)
     if args.random:                      # só as aleatórias (a feature roda sem --random)
         dirs = {k: v for k, v in dirs.items() if k.startswith("rand")}
     betas = [float(b) for b in args.betas.split(",")]
     conds = args.conds.split(",")
-    out_dir = (os.path.join(ROOT, "results", "replay", HF_TAG[replay]) if replay
+    out_dir = (os.path.join(ROOT, "results", "replay", HF_TAG[replay] + ("-nothink" if cfg.empty_think else "")) if replay
                else os.path.join(ROOT, "results", cfg.name, "steer_sae")); os.makedirs(out_dir, exist_ok=True)
     print(f"[{cfg.name}] camada {cfg.layer} | R={R if R is None else round(R, 3)} | claims={len(claims)} | direções={list(dirs)[:4]}{'...' if len(dirs) > 4 else ''} "
           f"| β={betas} | condições={conds}", flush=True)
 
     model, tok = load_model(cfg.checkpoint, cfg.quant, dev)
     if not replay:
-        model.model.layers[cfg.layer].register_forward_hook(make_hook())
+        decoder_layers(model)[cfg.layer].register_forward_hook(make_hook())
 
     def generate(prompt):
-        inputs = tok.apply_chat_template([{"role": "system", "content": SYSTEM_PROMPT},
-                                          {"role": "user", "content": prompt}],
-                                         add_generation_prompt=True, return_tensors="pt",
-                                         return_dict=True, enable_thinking=False).to(dev)
+        msgs = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+        if cfg.empty_think:      # DeepSeek-R1 sem raciocínio: mesmo prompt da coleta do SAE (data/prompt.py)
+            text = apply_empty_think(tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False), True)
+            inputs = tok(text, add_special_tokens=False, return_tensors="pt").to(dev)
+        else:
+            inputs = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt",
+                                             return_dict=True, enable_thinking=False).to(dev)
         o = model.generate(**inputs, max_new_tokens=args.max_new_tokens, do_sample=False,
                            pad_token_id=tok.pad_token_id)
         return strip_thinking(tok.decode(o[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True))
@@ -331,7 +397,7 @@ def run(args):
                 print(f"  {cond} {dkey} β={b:+.2f}: {i+1}/{len(claims)}", flush=True)
             torch.cuda.empty_cache() if i % 50 == 0 else None
         preds = [normalize(r) for r in raw]
-        res = {"cond": cond, "direction": dkey, "beta": b, "R": R, "layer": cfg.layer,
+        res = {"cond": cond, "direction": dkey, "beta": b, "R": R, "R_kind": args.norm, "layer": cfg.layer,
                "max_new_tokens": args.max_new_tokens, "ids": [c["id"] for c in claims],
                "gold": [c["gold"] for c in claims], "pred": preds, "raw": raw,
                "readable": [readable(r) for r in raw]}
@@ -355,9 +421,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", default="v3_llama")
     ap.add_argument("--feat", type=int, default=None)
+    ap.add_argument("--direction", default="feature", choices=["feature", "abstention"],
+                    help="feature = linha do decoder de --feat; abstention = direção diff-of-means NEI − SUP/REF (sem SAE)")
+    ap.add_argument("--empty-think", action="store_true",
+                    help="com --replay: fecha o <think> vazio (modelos de raciocínio respondem sem raciocinar)")
     ap.add_argument("--replay", default=None, choices=sorted(HF_TAG),
                     help="só o baseline (α=0) do veredito deste modelo do pipeline HF, sem SAE")
     ap.add_argument("--betas", default="0")
+    ap.add_argument("--norm", default="raw", choices=["raw", "centered"],
+                    help="régua da dose α/R: raw = E‖x‖ (Llama/Qwen3 rodados assim); centered = E‖x − μ‖ (Gemma; decisão 12/10/2026)")
     ap.add_argument("--conds", default="none,single,iterative")
     ap.add_argument("--random", type=int, default=0, help="nº de features aleatórias (controle)")
     ap.add_argument("--n", type=int, default=0, help="usa só os n primeiros claims (após o split)")
@@ -366,8 +438,8 @@ def main():
     ap.add_argument("--max-new-tokens", type=int, default=MAX_NEW_TOKENS)
     ap.add_argument("--check", action="store_true", help="só β=0 nas condições single/iterative")
     args = ap.parse_args()
-    if args.feat is None and not args.replay:
-        ap.error("--feat é obrigatório (exceto com --replay)")
+    if args.feat is None and not args.replay and args.direction == "feature":
+        ap.error("--feat é obrigatório (exceto com --replay ou --direction abstention)")
     if args.check:
         args.betas, args.conds = "0", "single,iterative"
     run(args)

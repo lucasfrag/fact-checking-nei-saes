@@ -47,7 +47,7 @@ def run(preset_name, n_per_class=1200, seed=0):
     labels = []
     for i, (ex, y) in enumerate(sample):
         ids, _ = templated_input_ids(tok, build_verdict_prompt(
-            ex["claim"], ex["evidence"], cfg.max_evidence), "cuda", cfg.max_seq_len)
+            ex["claim"], ex["evidence"], cfg.max_evidence), "cuda", cfg.max_seq_len, cfg.empty_think)
         if ids.shape[1] < 4:
             continue
         with torch.no_grad():

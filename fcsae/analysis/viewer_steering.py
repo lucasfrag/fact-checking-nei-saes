@@ -3,8 +3,10 @@
 Lê as células prontas de `results/<preset>/steer_sae/` (grade completa, 500 claims; ignora `.partial`,
 `__test100` e o controle aleatório) e gera `<out>/steering/<feat>.json` com:
   - curvas dose-resposta por condição (métricas da §3.1 do nb03: rótulo = `first_label`,
-    qualidade = `coherent`), incluindo α = 0 (baseline de cada condição);
-  - exemplos: claims em que a dose muda o veredito, com a resposta (truncada) em cada α/R.
+    qualidade = `coherent`), incluindo α = 0 (baseline de cada condição), e a % de cada rótulo
+    respondido em cada dose (`dist`; `gold_dist` = distribuição do gabarito);
+  - exemplos: claims em que a dose muda o veredito, com a resposta (truncada) em cada α/R;
+  - `<feat>_all_<cond>.json`: TODOS os claims da condição, com veredito e resposta (truncada) em cada α/R.
 
     python -m fcsae.analysis.viewer_steering --preset v3_llama --feat 19219 --out <viewer>/llama-3.1-8b-instruct/layer-15
 """
@@ -41,7 +43,8 @@ def metrics(pred, gold, ok, capped):
             "nei_rate": float(np.mean([p == "NEI" for p in pred])),
             "err_non_nei": float(np.mean([p != g for p, g in nn])) if nn else None,
             "coherent": float(np.mean(ok)),
-            "hit_cap": float(np.mean(capped))}   # resposta chegou ao teto de tokens (loop)
+            "hit_cap": float(np.mean(capped)),   # resposta chegou ao teto de tokens (loop)
+            "dist": {c: float(np.mean([p == c for p in pred])) for c in CLS}}   # % de cada rótulo respondido
 
 
 def cut(t):
@@ -66,10 +69,10 @@ def run(args):
     tok = AutoTokenizer.from_pretrained(cfg.checkpoint)
     cap = lambda t, n: len(tok(t, add_special_tokens=False).input_ids) >= n - 6   # margem p/ tokens especiais
 
-    curves, examples = {}, {}
+    curves, examples, all_rows = {}, {}, {}
     for cond in COND_LABEL:
         betas = sorted(b for (c, b) in cells if c == cond)
-        if 0.0 not in betas:
+        if 0.0 not in betas or len(betas) < 2:          # condição sem steering rodado (só o baseline)
             continue
         base = cells[(cond, 0.0)]; ids = base["ids"]; gold = base["gold"]
         preds = {b: [first_label(x) for x in cells[(cond, b)]["raw"]] for b in betas}
@@ -108,6 +111,15 @@ def run(args):
                            "responses": [{"alpha_over_R": b, "pred": preds[b][i], "text": cut(cells[(cond, b)]["raw"][i])}
                                          for b in betas]})
         examples[cond] = ex
+        # todas as instâncias (página "browse all claims" do viewer): um arquivo por condição
+        rows = []
+        for i, cid in enumerate(ids):
+            c = claims[cid]
+            ev = [] if cond == "none" else [{"text": (e.get("text") or "")[:300] + ("…" if len(e.get("text") or "") > 300 else ""),
+                                            "url": e.get("url")} for e in c[cond]["evidence"][:3]]
+            rows.append({"claim_id": cid, "claim": c["claim"], "gold": gold[i], "evidence": ev,
+                         "pred": [preds[b][i] for b in betas], "text": [cut(cells[(cond, b)]["raw"][i]) for b in betas]})
+        all_rows[cond] = {"betas": betas, "rows": rows}
     R = next(iter(cells.values()))["R"]
     out = {"feature": args.feat, "preset": cfg.name, "model": cfg.checkpoint, "layer": cfg.layer, "R": R,
            "n_claims": 500, "dataset": "AVeriTeC dev (first 500 claims)",
@@ -115,10 +127,16 @@ def run(args):
            "formula": "x <- x + alpha * d_feat at every position of layer L, prompt and generated tokens (Ferrando et al., 2025, Eq. 4); "
                       "alpha is reported as alpha/R, R = mean residual norm at the decision position",
            "label_rule": "first full uppercase label written by the model (NEI if none)",
+           "gold_dist": {c: float(np.mean([g == c for g in gold])) for c in CLS},
            "curves": curves, "examples": examples}
     os.makedirs(os.path.join(args.out, "steering"), exist_ok=True)
     p = os.path.join(args.out, "steering", f"{args.feat}.json")
     json.dump(out, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    for cond, d_all in all_rows.items():
+        pa = os.path.join(args.out, "steering", f"{args.feat}_all_{cond}.json")
+        json.dump({"feature": args.feat, "cond": cond, "condition": COND_LABEL[cond], **d_all},
+                  open(pa, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        print(f"  todas as instâncias ({cond}): {pa} ({os.path.getsize(pa)/1e6:.1f} MB)")
     for cond, cv in curves.items():
         print(f"{cond:10s} α/R={[c['alpha_over_R'] for c in cv]}  exemplos={len(examples[cond])}")
     print(f"FIM: {p} ({os.path.getsize(p)/1e3:.0f} kB)")

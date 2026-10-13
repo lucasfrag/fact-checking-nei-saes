@@ -719,6 +719,58 @@ pd.DataFrame(rows, columns=["condição", "α/R", "Acc", "F1", "F1 SUP", "F1 REF
   .set_index(["condição", "α/R"]).round(3) if rows else "ainda sem células"
 """)
 
+md(r"""### 5.2.1 Matrizes de confusão de cada dose (500 claims)
+
+**Como ler.** Uma figura por condição de evidência (sem evidência, Single-step, Iterative) e, dentro dela,
+uma matriz por dose, lidas da esquerda para a direita e de cima para baixo: de α/R = −1 (feature mais
+diminuída) a α/R = +1 (mais aumentada); a matriz do **centro**, **α/R = 0** (título em negrito), é o modelo
+sem steering. Em cada matriz: **linhas = rótulo verdadeiro** (gold), **colunas =
+rótulo que o modelo escreveu** (1º rótulo, §3.1), e cada célula é o **número de claims** (500 no total; as
+linhas somam o gold: SUP 122, REF 305, NEI 35, CONF 38). A **diagonal** é o acerto; a **coluna NEI** mostra
+quantos claims de cada classe viraram abstenção. A cor é relativa ao maior valor de cada matriz. No título:
+α/R, α, acurácia e fração de respostas **em loop** (chegaram ao limite de 1.536 tokens, §2.3.2).
+
+A grade executada vai de −1 a +1 em passos de 0,25 (os valores |α/R| > 1 da grade planejada foram cortados,
+§2.3).""")
+
+code(r"""def cm4(pred, gold):
+    M = np.zeros((4, 4), dtype=int)
+    for p, g in zip(pred, gold):
+        M[CLS.index(g), CLS.index(p)] += 1
+    return M
+
+for cond in COND:
+    rs = sorted([r for r in cells500 if r["cond"] == cond], key=lambda r: r["beta"])
+    if not rs: continue
+    nc = 3; nr = int(np.ceil(len(rs) / nc))            # 3×3: α/R = 0 fica no centro
+    fig, axes = plt.subplots(nr, nc, figsize=(3.6 * nc, 3.4 * nr))
+    for ax in np.ravel(axes)[len(rs):]: ax.axis("off")
+    for ax, r in zip(np.ravel(axes), rs):
+        M = cm4(r["pred"], r["gold"]); acc = np.trace(M) / M.sum(); loop = np.mean(r["capped"])
+        ax.imshow(M, cmap="Blues", vmin=0, vmax=M.max())
+        for a in range(4):
+            for b in range(4):
+                ax.text(b, a, str(M[a, b]), ha="center", va="center", fontsize=8,
+                        color="white" if M[a, b] > .6 * M.max() else "black")
+        ax.set_xticks(range(4)); ax.set_xticklabels(CLS, fontsize=7)
+        ax.set_yticks(range(4)); ax.set_yticklabels(CLS, fontsize=7)
+        ax.set_title(f"α/R = {r['beta']:+.2f} (α = {r['beta'] * 8.375:+.2f})\nacc {acc:.3f} · loop {loop:.0%}", fontsize=8,
+                     fontweight="bold" if r["beta"] == 0 else "normal")
+        ax.set_ylabel("verdadeiro", fontsize=8)
+        ax.set_xlabel("predito", fontsize=8)
+    fig.suptitle(f"{COND[cond]} — feature 19219, 500 claims", fontsize=10, y=1.02)
+    plt.tight_layout(); plt.show()
+
+# as mesmas contagens em tabela (linhas = condição × α/R; colunas = verdadeiro→predito)
+rows = []
+for cond in COND:
+    for r in sorted([r for r in cells500 if r["cond"] == cond], key=lambda r: r["beta"]):
+        M = cm4(r["pred"], r["gold"])
+        rows.append([COND[cond], r["beta"]] + [M[i, j] for i in range(4) for j in range(4)])
+CM = pd.DataFrame(rows, columns=["condição", "α/R"] + [f"{g}→{p}" for g in CLS for p in CLS]).set_index(["condição", "α/R"])
+display(Markdown("**Tabela das 27 matrizes** — cada coluna `X→Y` = claims com gold X que o modelo rotulou Y."))
+CM""")
+
 md(r"""### 5.3 α escolhido na validação e resultado na metade de teste
 
 **Como ler.** A 1ª tabela mostra, para **cada dose**, os números da **validação** (`claim_id` par) que as

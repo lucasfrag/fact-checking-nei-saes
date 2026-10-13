@@ -19,9 +19,9 @@ PY=${PY:-/home/systemp2w/miniconda3/envs/fcsae/bin/python}
 cd "$(dirname "$0")/.."
 mkdir -p logs
 
-ACT="$FCSAE_STORE/activations/$PRESET"
-CKP="$FCSAE_STORE/checkpoints/$PRESET"
-RES="$FCSAE_STORE/results/$PRESET"
+# pastas vêm do próprio preset (um preset pode reusar as ativações de outro: `activations_from`)
+mapfile -t _P < <($PY -c "from fcsae.config import preset; p = preset('$PRESET').paths(); print(p['activations']); print(p['sae']); print(p['results'])")
+ACT=${_P[0]}; CKP=${_P[1]}; RES=${_P[2]}
 
 run_phase() {   # nome, marcador, módulo, [stall em s]
   local name=$1 marker=$2 mod=$3 stall=${4:-$STALL} try=0

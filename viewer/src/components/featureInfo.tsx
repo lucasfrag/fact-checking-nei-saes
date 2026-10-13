@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react"
 import { Link } from "react-router-dom"
 import { normalizeSequences, Feature, FeatureInfo, SteeringInfo } from "../types"
 import TokenHeatmap from "./tokenHeatmap";
-import Histogram from "./histogram"
+import Histogram, { bandSummary } from "./histogram"
 import Tooltip from "./tooltip"
 import { get_feature_info, get_steering } from "../interpAPI"
 import { pathForFeature, STEERED } from "../autoencoder_registry"
@@ -19,6 +19,16 @@ const LabelBadge = ({label}: {label?: string}) => label ? (
 const PTB: {[key: string]: string} = {'-LRB-': '(', '-RRB-': ')', '-LSB-': '[', '-RSB-': ']', '-LCB-': '{', '-RCB-': '}', '-COLON-': ':'}
 const cleanEvidence = (e: string) => e.replace(/-(LRB|RRB|LSB|RSB|LCB|RCB|COLON)-/g, (m) => PTB[m])
 const VERDICT_MARKER = ' ▶ verdict'
+
+// one plain-language sentence from the stats (no claims beyond what the numbers show)
+const summary = (fc: NonNullable<FeatureInfo['fc']>) => {
+  const auc = fc.auc_nei_vs_dec_approx
+  const where = `It fires on ${(100 * fc.frac_active).toFixed(fc.frac_active < 0.01 ? 2 : 0)}% of verdicts. `
+  if (auc === null || auc === undefined) return where
+  if (auc >= 0.6) return where + `It tends to be stronger when the evidence is NOT enough to decide: ${Math.round(100 * (fc.nei_top20 ?? 0))}% of its 20 strongest claims are NEI, against ${Math.round(100 * fc.nei_base)}% on average.`
+  if (auc <= 0.4) return where + `It tends to be stronger when the claim CAN be decided (supported or refuted): only ${Math.round(100 * (fc.nei_top20 ?? 0))}% of its 20 strongest claims are NEI, against ${Math.round(100 * fc.nei_base)}% on average.`
+  return where + `Its strength is not clearly related to whether the evidence is enough (separation score close to 0.5).`
+}
 
 const pct = (x: number | null | undefined) => (x === null || x === undefined) ? 'n/a' : `${(100 * x).toFixed(1)}%`
 
@@ -81,8 +91,9 @@ export default ({ feature }: {feature: Feature}) => {
   return (
     <div>
       {got_error ? <span style={{color: '#ee5555'}}>{got_error}</span> : null}
-      <div className="text-sm text-gray-700 mb-3" style={{maxWidth: 900}}>
-        <p className="mb-1"><b>How to read this page.</b> For every claim (from FEVER or VitaminC) the model reads a verdict prompt with
+      <details className="text-sm text-gray-700 mb-3" style={{maxWidth: 900}}>
+        <summary style={{cursor: 'pointer'}}><b>How to read this page</b></summary>
+        <p className="mb-1 mt-1">For every claim (from FEVER or VitaminC) the model reads a verdict prompt with
           the claim, its evidence and the instructions, and then writes its verdict. The feature is measured at a single point:
           the <b>last prompt token</b>, right before the model answers.</p>
         <ul style={{listStyle: 'disc', paddingLeft: 20}}>
@@ -93,51 +104,52 @@ export default ({ feature }: {feature: Feature}) => {
           <li>Whether a claim is NEI depends on its <b>evidence</b>, not on the claim alone, so the evidence is shown under each claim.
             The same claim can appear more than once with different evidence.</li>
         </ul>
+      </details>
+      <div style={{maxWidth: 950}}>
+        <h3 className="text-md font-bold">Is the evidence insufficient when this feature fires strongly?</h3>
+        <p className="text-sm mb-1"><b>{bandSummary(data)}</b></p>
+        {fc &&
+          <div className="text-sm text-gray-700 mb-1" style={{display: 'flex', gap: 18, flexWrap: 'wrap'}}>
+            <Tooltip content={<span>fires on <b>{pct(fc.frac_active)}</b> of answers</span>} tooltip={'share of all verdicts where the feature is active (> 0)'}/>
+            <Tooltip content={<span>NEI among its 20 strongest: <b>{pct(fc.nei_top20)}</b></span>} tooltip={'of the 20 claims that activate it most, how many have NEI as the correct answer (average 20%)'}/>
+            <Tooltip content={<span>AUC <b>{fc.auc_nei_vs_dec_approx !== null && fc.auc_nei_vs_dec_approx !== undefined ? fc.auc_nei_vs_dec_approx.toFixed(3) : 'n/a'}</b></span>}
+              tooltip={'chance that a random NEI claim activates it more than a random SUP/REF claim (0.5 = no link; below 0.5 = fires more on SUP/REF claims)'}/>
+          </div>}
+        <div style={{height: '320px'}}><Histogram data={data} /></div>
       </div>
-      <div style={{flexDirection: 'row', display: 'flex', flexWrap: 'wrap'}}>
-        <div style={{width: '520px', height: '220px'}}>
-          <Histogram data={data} />
-        </div>
-        <table style={{marginLeft: '20px'}} className="text-sm">
-          <tbody>
-            <tr><td><Tooltip content={'Fraction active'} tooltip={'P(a > 0) over all decision positions'}/></td><td>{pct(fc?.frac_active)}</td></tr>
-            <tr><td><Tooltip content={'NEI rate when active'} tooltip={'fraction of NEI claims among decisions where the feature fires'}/></td>
-                <td>{pct(fc?.nei_rate_when_active)} <span className="text-gray-500">(base {pct(fc?.nei_base)})</span></td></tr>
-            <tr><td><Tooltip content={'AUC NEI vs. SUP/REF'} tooltip={'how well the activation separates NEI from decided claims (0.5 = chance); computed from 40-bin histograms'}/></td>
-                <td>{fc?.auc_nei_vs_dec_approx !== null && fc?.auc_nei_vs_dec_approx !== undefined ? fc.auc_nei_vs_dec_approx.toFixed(3) : 'n/a'}</td></tr>
-            <tr><td><Tooltip content={'NEI in top-10 / top-20'} tooltip={'fraction of NEI claims among the claims that activate the feature most'}/></td>
-                <td>{pct(fc?.nei_top10)} / {pct(fc?.nei_top20)}</td></tr>
-            <tr><td><Tooltip content={'Mean'} tooltip={'E[a]'}/></td><td>{data.mean_act.toExponential(2)}</td></tr>
-            <tr><td><Tooltip content={'E[a²]'} tooltip={'second moment'}/></td><td>{data.mean_act_squared.toExponential(2)}</td></tr>
-          </tbody>
-        </table>
-        {data.logits &&
-          <table style={{marginLeft: '20px'}} className="text-sm">
-            <thead><tr><th colSpan={2}><Tooltip content={'Logit effects'} tooltip={'tokens most promoted / suppressed by the decoder direction (logit lens: final norm + unembedding)'}/></th></tr></thead>
-            <tbody>
-              {data.logits.up.map(([tok, v], i) => (
-                <tr key={i}>
-                  <td style={{color: '#2a9d5c'}}><code>{JSON.stringify(tok)}</code> {v.toFixed(2)}</td>
-                  <td style={{color: '#d9534f', paddingLeft: 12}}><code>{JSON.stringify(data.logits!.down[i][0])}</code> {data.logits!.down[i][1].toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        }
-        {data.neighbors &&
-          <table style={{marginLeft: '20px'}} className="text-sm">
-            <thead><tr><th><Tooltip content={'Nearest features'} tooltip={'cosine similarity between decoder directions'}/></th></tr></thead>
-            <tbody>
-              {data.neighbors.map(({atom, cos}) => (
-                <tr key={atom}><td>
-                  <Link className="text-blue-500 hover:text-blue-700" to={pathForFeature({...feature, atom})}>#{atom}</Link> {cos.toFixed(3)}
-                </td></tr>
-              ))}
-            </tbody>
-          </table>
-        }
-      </div>
-      {steering ? <SteeringPanel data={steering}/> : null}
+      {(data.logits || data.neighbors) &&
+        <details className="mt-2 mb-3 text-sm">
+          <summary style={{cursor: 'pointer'}} className="text-gray-700">Technical details (for researchers)</summary>
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: 30, marginTop: 8}}>
+            {data.logits &&
+              <div style={{maxWidth: 420}}>
+                <b>Logit effects</b>
+                <p className="text-gray-600 mb-1">If this feature pushed the model directly towards its output, which tokens would become more
+                  (green) or less (red) likely? (logit lens: decoder direction → final norm → unembedding). Meaningless-looking tokens
+                  mean the feature does not act on specific words directly, but through later layers.</p>
+                <table><tbody>
+                  {data.logits.up.map(([tok, v], i) => (
+                    <tr key={i}>
+                      <td style={{color: '#2a9d5c'}}><code>{JSON.stringify(tok)}</code> {v.toFixed(2)}</td>
+                      <td style={{color: '#d9534f', paddingLeft: 12}}><code>{JSON.stringify(data.logits!.down[i][0])}</code> {data.logits!.down[i][1].toFixed(2)}</td>
+                    </tr>))}
+                </tbody></table>
+              </div>}
+            {data.neighbors &&
+              <div style={{maxWidth: 300}}>
+                <b>Nearest features</b>
+                <p className="text-gray-600 mb-1">Features whose direction inside the model is most similar to this one (cosine similarity
+                  of decoder directions; 1 = identical). High values would mean the concept is split across several features.</p>
+                <table><tbody>
+                  {data.neighbors.map(({atom, cos}) => (
+                    <tr key={atom}><td>
+                      <Link className="text-blue-500 hover:text-blue-700" to={pathForFeature({...feature, atom})}>#{atom}</Link> {cos.toFixed(3)}
+                    </td></tr>))}
+                </tbody></table>
+              </div>}
+          </div>
+        </details>}
+      {steering ? <SteeringPanel data={steering} path={feature.autoencoder.path}/> : null}
       {all_sequences.map(({label, sequences, default_show, note}, idx) => {
         const n_show = showingMore[label] ? sequences.length : default_show;
         return (

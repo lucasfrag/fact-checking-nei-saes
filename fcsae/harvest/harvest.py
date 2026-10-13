@@ -63,6 +63,11 @@ def ensure_example_files(cfg, out_dir):
     return ex_path
 
 
+# Tipo de gravação das ativações. float16 (padrão) basta para Llama/Qwen3/DeepSeek; nos Gemma uma dimensão do
+# resíduo vale ~32.768 em todo token ("massive activations", Sun et al. 2024) e estoura o teto do float16 (65.504)
+# → inf → treino nan. bfloat16 = formato em que o próprio modelo calcula (compute dtype do nf4): sem estouro.
+STORE_DTYPE = {"float16": torch.float16, "bfloat16": torch.bfloat16}
+
 class Sharder:
     def __init__(self, out_dir, shard_tokens, prog):
         self.out_dir, self.shard_tokens, self.prog = out_dir, shard_tokens, prog
@@ -129,13 +134,13 @@ def run(cfg: Config):
                     continue
                 ex = json.loads(line)
                 ids, _ = templated_input_ids(tok, build_verdict_prompt(
-                    ex["claim"], ex["evidence"], cfg.max_evidence), dev, cfg.max_seq_len)
+                    ex["claim"], ex["evidence"], cfg.max_evidence), dev, cfg.max_seq_len, cfg.empty_think)
                 if ids.shape[1] < 4:
                     # mantém alinhamento com a linha: grava um token dummy? Não — em vez disso
                     # nunca acontece (prompt de veredito sempre > 4 tokens). Conta como feito.
                     prog["dom_prompts"] += 1
                     continue
-                h = residual_at_layer(model, ids, cfg.layer)[1:].to(torch.float16).cpu()
+                h = residual_at_layer(model, ids, cfg.layer)[1:].to(STORE_DTYPE[cfg.dtype_store]).cpu()
                 is_dec = torch.zeros(h.shape[0], dtype=torch.bool); is_dec[-1] = True
                 sh.add(h, is_dec, ex["label"], ex["source"])
                 if prog["dom_prompts"] % 500 == 0:
@@ -166,7 +171,7 @@ def run(cfg: Config):
                 if ids.shape[1] < 8:
                     prog["gen_passages"] += 1
                     continue
-                h = residual_at_layer(model, ids, cfg.layer)[1:].to(torch.float16).cpu()
+                h = residual_at_layer(model, ids, cfg.layer)[1:].to(STORE_DTYPE[cfg.dtype_store]).cpu()
                 sh.add(h, torch.zeros(h.shape[0], dtype=torch.bool), "NEI", "general")
                 if prog["gen_tokens"] % 200_000 < cfg.max_seq_len:
                     print(f"  geral ~{prog['gen_tokens']}/{target}", flush=True)

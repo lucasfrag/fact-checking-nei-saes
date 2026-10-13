@@ -41,7 +41,15 @@ def load_unembed(checkpoint, dev):
         with safe_open(hf_hub_download(checkpoint, idx[name]), "pt") as f:
             return f.get_tensor(name)
     dt = torch.float16 if dev == "cuda" else torch.float32          # CPU: matmul em float32
-    return get("lm_head.weight").to(dev, dt), get("model.norm.weight").to(dev, torch.float32)
+    # nomes variam: Llama/Qwen3 = "lm_head.weight" + "model.norm.weight"; Gemma3 (multimodal, embeddings amarradas)
+    # = "language_model.model.embed_tokens.weight" + "language_model.model.norm.weight"
+    first = lambda names: next(n for n in names if n in idx)
+    U = get(first(["lm_head.weight", "language_model.lm_head.weight", "model.embed_tokens.weight",
+                   "language_model.model.embed_tokens.weight", "model.language_model.embed_tokens.weight"]))
+    g = get(first(["model.norm.weight", "language_model.model.norm.weight", "model.language_model.norm.weight"])).float()
+    if "gemma" in checkpoint.lower():   # RMSNorm do Gemma escala por (1 + peso), não pelo peso
+        g = 1.0 + g
+    return U.to(dev, dt), g.to(dev)
 
 
 @torch.no_grad()

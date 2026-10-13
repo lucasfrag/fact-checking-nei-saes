@@ -45,6 +45,7 @@ class Config:
 
     # --- modelo / captura ---
     model_tag: str = "llama3.1:8b"
+    activations_from: str = ""            # reusa as ativações de outro preset (ex.: SAE de outro tamanho)
     layer: int = 15                       # camada do residual stream a capturar (meio da rede)
     quant: str = "4bit"                   # "4bit" | "8bit" | "bf16"
     device: str = "cuda"
@@ -57,6 +58,8 @@ class Config:
     max_per_dataset: int = 60_000         # teto de claims por dataset (0 = sem teto)
     max_evidence: int = 4                 # nº máx. de trechos de evidência no prompt
     max_seq_len: int = 512                # truncamento do prompt (tokens)
+    empty_think: bool = False             # modelos de raciocínio (DeepSeek-R1): fecha o <think> vazio no prompt, p/ o último
+                                          # token ser o início do veredito (Lucas, 09/10/2026; ver EMPTY_THINK em data/prompt.py)
 
     # --- harvest ---
     shard_tokens: int = 500_000           # nº de token-ativações por shard em disco
@@ -83,7 +86,7 @@ class Config:
     def paths(self) -> dict:
         base = self.name
         return {
-            "activations": os.path.join(ACTIVATIONS, base),
+            "activations": os.path.join(ACTIVATIONS, self.activations_from or base),
             "sae": os.path.join(CHECKPOINTS, base),
             "results": os.path.join(RESULTS, base),
         }
@@ -140,7 +143,38 @@ def preset(name: str) -> Config:
     if name == "v3_deepseek":
         return Config(name="v3_deepseek", model_tag="deepseek-r1:8b", layer=15,
                       max_per_dataset=0, sae_dead_steps=5000, **GAO_OPT)
+    # Teste de robustez do tamanho do dicionário (Lucas, 01/10/2026; FAQ pergunta 21): MESMAS ativações e
+    # configuração do v3_deepseek, só n = 8.192 (2× d) em vez de 32.768 — feature splitting [Bricken 2023;
+    # Templeton 2024]. lr mantido em 1e-4 (o mesmo do 32.768) para isolar o efeito do tamanho.
+    if name == "v3_deepseek_w8k":
+        return Config(name="v3_deepseek_w8k", model_tag="deepseek-r1:8b", layer=15, activations_from="v3_deepseek",
+                      max_per_dataset=0, sae_dead_steps=5000, sae_width=8192, **GAO_OPT)
     if name == "v3_qwen3":
         return Config(name="v3_qwen3", model_tag="qwen3:8b", layer=19,
+                      max_per_dataset=0, sae_dead_steps=5000, **GAO_OPT)
+    # Lucas (06/10/2026): camada 22 = início do platô da varredura do Qwen3 (AUC 0,867, empatada com a 26; a 19 fica
+    # 0,03 abaixo). Mesma regra dos outros modelos: a camada onde a abstenção é mais legível (FAQ pergunta 6).
+    # DeepSeek refeito do zero (Lucas, 09/10/2026). Duas correções em relação ao v3_deepseek:
+    # (1) raciocínio vazio — o template do R1 termina em "<think>\n", então o último token era o INÍCIO do
+    #     raciocínio, não o veredito; com "<think>\n\n</think>\n\n" o modelo responde direto, como Llama/Qwen3;
+    # (2) max_seq_len 16.384 > maior prompt do dataset (15.639 tokens): nenhum prompt é cortado (com 512, 149 eram).
+    # A camada é escolhida pela varredura nesta posição nova (layer=15 é só o valor provisório).
+    if name == "v3_deepseek_nothink":
+        return Config(name="v3_deepseek_nothink", model_tag="deepseek-r1:8b", layer=15, empty_think=True,
+                      max_seq_len=16_384, mix_general=False, max_per_dataset=0, sae_dead_steps=5000, **GAO_OPT)
+    # Gemma (Lucas, 10–11/10/2026): ativações gravadas em bfloat16 (a dim. 443 do Gemma3 vale ~32.768 e estourava o
+    # float16 → inf → treino nan; ver STORE_DTYPE em harvest.py). d = 2.560 → dicionário de 8 × d = 20.480 features (mesma proporção dos modelos de
+    # d = 4.096, que usam 32.768; mesma justificativa: Gao et al. 2024; Llama Scope). Sem truncamento (max_seq_len
+    # 16.384). A camada é escolhida pela varredura com a mesma regra dos outros (layer = valor provisório).
+    if name == "v3_gemma3":
+        return Config(name="v3_gemma3", model_tag="gemma3:4b", layer=19, sae_width=20_480, max_seq_len=16_384,
+                      mix_general=False, max_per_dataset=0, sae_dead_steps=5000, dtype_store="bfloat16",
+                      **GAO_OPT)
+    if name == "v3_gemma4":
+        return Config(name="v3_gemma4", model_tag="gemma4:e4b", layer=21, sae_width=20_480, max_seq_len=16_384,
+                      mix_general=False, max_per_dataset=0, sae_dead_steps=5000, dtype_store="bfloat16",
+                      **GAO_OPT)
+    if name == "v3_qwen3_l22":
+        return Config(name="v3_qwen3_l22", model_tag="qwen3:8b", layer=22,
                       max_per_dataset=0, sae_dead_steps=5000, **GAO_OPT)
     raise KeyError(f"preset desconhecido: {name}")
