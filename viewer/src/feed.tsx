@@ -23,7 +23,7 @@ export default function Feed() {
     <div>
       <div>
         <h2 className="flex flex-row">
-          <Link to="/">Fact-Checking Abstention SAE Viewer</Link>
+          <Link to="/">Fact-Checking NEI SAE Viewer</Link>
         </h2>
           <FeatureSelect
             init_feature={feature}

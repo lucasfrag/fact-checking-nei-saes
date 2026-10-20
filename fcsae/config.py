@@ -160,7 +160,7 @@ def preset(name: str) -> Config:
     # (2) max_seq_len 16.384 > maior prompt do dataset (15.639 tokens): nenhum prompt é cortado (com 512, 149 eram).
     # A camada é escolhida pela varredura nesta posição nova (layer=15 é só o valor provisório).
     if name == "v3_deepseek_nothink":
-        return Config(name="v3_deepseek_nothink", model_tag="deepseek-r1:8b", layer=15, empty_think=True,
+        return Config(name="v3_deepseek_nothink", model_tag="deepseek-r1:8b", layer=16, empty_think=True,
                       max_seq_len=16_384, mix_general=False, max_per_dataset=0, sae_dead_steps=5000, **GAO_OPT)
     # Gemma (Lucas, 10–11/10/2026): ativações gravadas em bfloat16 (a dim. 443 do Gemma3 vale ~32.768 e estourava o
     # float16 → inf → treino nan; ver STORE_DTYPE em harvest.py). d = 2.560 → dicionário de 8 × d = 20.480 features (mesma proporção dos modelos de

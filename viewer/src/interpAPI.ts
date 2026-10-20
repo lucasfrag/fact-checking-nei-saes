@@ -2,7 +2,7 @@ import {Feature, FeatureInfo, FeatureIndex, SteeringInfo, SteeringAll} from './t
 
 // Per-feature JSONs live in the companion Hugging Face dataset (CORS-enabled):
 //   viewer/<model>/layer-<L>/atoms/<atom // 1000>/<atom>.json   and   viewer/<model>/layer-<L>/index.json
-export const DATA_BASE = "https://huggingface.co/datasets/lucasfrag/fact-checking-abstention-saes-data/resolve/main/viewer"
+export const DATA_BASE = "https://huggingface.co/datasets/lucasfrag/fact-checking-nei-saes-data/resolve/main/viewer"
 
 const load_json = async (url: string) => {
   const res = await fetch(url, {method: "GET", mode: "cors"})

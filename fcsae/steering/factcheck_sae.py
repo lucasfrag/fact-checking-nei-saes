@@ -184,6 +184,47 @@ def refusal(response):
     return bool(_REFUSAL.search(response or ""))
 
 
+# ---------------------------------------------------------------- regra de rótulo v2 (Lucas, 15/10/2026)
+# Três tipos de resposta sem o rótulo escrito exatamente certo (achados nas doses extremas de steering):
+#   1. rótulo com erro de grafia ("NOT ENUFF EVIDENCE", "CONFLECTING EVIDENCE", "REFOUTED") → o rótulo;
+#   2. abstenção por extenso ("I couldn't find any information…", "the evidence provided is insufficient to
+#      determine…") → NEI (como a "knowledge refusal" de Ferrando et al., 2025);
+#   3. nada disso (",", "***", texto sem veredito) → "NOLABEL" (categoria própria; conta como erro na acurácia).
+_LABEL_FUZZY = __import__("re").compile(
+    r"NOT\s+EN\w*\s+EVI\w*|NOT\s+ENOUGH\s+INFO\w*|CONF\w{0,4}CTING|CONFLICT\w*|CHERRY\s*-?\s*PICK\w*|SUPPORT\w*|REF\w{0,2}UT\w*")
+_FIRST_LINE = __import__("re").compile(r"(not enough evidence|conflicting evidence|supported|refuted)\b", __import__("re").I)
+# frases de NEI por extenso: a lista congelada REFUSAL_PATTERNS + variantes de "evidência insuficiente" (15/10/2026)
+NEI_TEXT_PATTERNS = REFUSAL_PATTERNS + [
+    r"\bnot enough (evidence|information|info)\b",
+    r"\binsufficient (evidence|information)\b",
+    r"\b(evidence|information)( provided| given)? (is|are|was|were) (insufficient|not enough|not sufficient|inconclusive)",
+]
+_NEI_TEXT = __import__("re").compile("|".join(NEI_TEXT_PATTERNS), __import__("re").I)
+
+
+def _fuzzy_to_label(s):
+    s = s.upper()
+    if s.startswith("NOT"):
+        return "NEI"
+    if s.startswith("CONF") or s.startswith("CHERRY"):
+        return "CONF"
+    return "SUP" if s.startswith("SUPPORT") else "REF"
+
+
+def verdict_label(response):
+    """Regra de rótulo v2: (1) primeiro rótulo em MAIÚSCULAS, tolerando erro de grafia, fora de enumerações;
+    (2) senão, rótulo na 1ª linha em qualquer caixa; (3) senão, abstenção por extenso → NEI; (4) senão → NOLABEL."""
+    t = _verdict_text(response)
+    m = _LABEL_FUZZY.search(t)
+    if m:
+        return _fuzzy_to_label(m.group(0))
+    first = __import__("re").sub(r"[*#_`>\-\s:]+", " ", t.strip().split("\n")[0] if t.strip() else "").strip()
+    m = _FIRST_LINE.match(first)
+    if m:
+        return _fuzzy_to_label(m.group(0))
+    return "NEI" if _NEI_TEXT.search(t) else "NOLABEL"
+
+
 def coherent(response):
     """Critério de qualidade do steering (a partir de 27/09): rótulo OU recusa por falta de
     informação. O que sobra (texto sem conclusão, recusa de segurança) conta como 'quebrou'."""

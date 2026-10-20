@@ -342,7 +342,8 @@ leitura. Foi o que fez "aumentar NEI" parecer não aumentar a abstenção com ev
 **Exemplos e contagens de cada tipo de resposta: §4.2.**
 
 **Decisão (28/09/2026):** a **métrica principal** deste notebook usa o **rótulo que o modelo
-produziu**, ignorando a explicação (`first_label` em `fcsae/steering/factcheck_sae.py`).
+produziu**, ignorando a explicação (`first_label` em `fcsae/steering/factcheck_sae.py`). **Substituída em 15/10/2026 pela
+regra v2 (`verdict_label`, §3.1.2).**
 
 **O que conta como rótulo:** a expressão completa **escrita como rótulo, em MAIÚSCULAS** —
 `SUPPORTED`, `REFUTED`, `NOT ENOUGH EVIDENCE`, `CONFLICTING EVIDENCE`. Verificamos nas células que o
@@ -398,6 +399,24 @@ em vez do que ele **decidiu**. Como a leitura é feita sobre o texto salvo, a co
 nenhuma célula.
 """)
 
+md(r"""#### 3.1.2 Regra de rótulo v2 (15/10/2026) — erro de grafia, abstenção por extenso e "sem rótulo"
+
+Nas doses extremas de steering (sobretudo no Gemma3) apareceram respostas que a regra anterior lia errado: o rótulo
+com **erro de grafia** (`NOT ENUFF EVIDENCE`, `**CONFLECTING EVIDENCE/CHERRYPICKing**`) e **texto sem veredito**
+(`,`, `***\n***`), ambos contados como NEI pelo padrão "sem rótulo → NEI". **Decisão do Lucas:** regra v2
+(`verdict_label` em `fcsae/steering/factcheck_sae.py`):
+
+1. 1º rótulo em MAIÚSCULAS, tolerando erro de grafia, fora de enumerações das opções;
+2. senão, rótulo na 1ª linha em qualquer caixa (`Supported. The claim…`);
+3. senão, **abstenção por extenso** (lista `REFUSAL_PATTERNS` + "not enough / insufficient evidence") → **NEI**, como
+   a *knowledge refusal* de Ferrando et al. (2025);
+4. senão → **NOLABEL**: categoria própria (erro na acurácia; não conta como NEI).
+
+**Impacto:** steering — Llama 3,2% das respostas mudam (342 NEI → NOLABEL; 86 NEI → um rótulo real), Qwen3 0,5%,
+Gemma3 27% (doses ±4,5 e ±6); bases do RQ1 — só o DeepSeek muda (10 de 1.000 respostas). As bases do Llama (0,360 de
+acurácia e 0,620 de NEI no Single; 0,420 e 0,494 no Iterative) não mudam. A métrica principal deste notebook passa a
+ser a regra v2.""")
+
 md(r"""## 4. Carregamento e métricas""")
 
 code(r"""import json, glob, os, re, collections
@@ -409,7 +428,7 @@ D = "../results/v3_llama/steer_sae"
 CLS = ["SUP", "REF", "NEI", "CONF"]
 COND = {"none": "sem evidência", "single": "Single-step", "iterative": "Iterative"}
 THR = 0.80                                  # coerência mínima (§2.3)
-from fcsae.steering.factcheck_sae import coherent, readable as has_label, first_label, REFUSAL_PATTERNS
+from fcsae.steering.factcheck_sae import coherent, readable as has_label, first_label, verdict_label, REFUSAL_PATTERNS
 from transformers import AutoTokenizer
 _tok = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")   # conta tokens p/ detectar loop (§2.3.2)
 
@@ -435,7 +454,7 @@ for p in sorted(glob.glob(f"{D}/*.json")):
     r = json.load(open(p, encoding="utf-8")); r["subset"] = m.group(4) or ""
     r["label_ok"] = [has_label(x) for x in r["raw"]]          # critério original (§2.3.1)
     r["pred_pipeline"] = r["pred"]                             # regra do pipeline (normalize)
-    r["pred"] = [first_label(x) for x in r["raw"]]             # MÉTRICA PRINCIPAL: 1º rótulo (§3.1)
+    r["pred"] = [verdict_label(x) for x in r["raw"]]           # MÉTRICA PRINCIPAL: regra de rótulo v2 (§3.1.2)
     r["readable"] = [coherent(x) for x in r["raw"]]           # critério principal: coerente
     r["capped"] = [len(_tok(x, add_special_tokens=False).input_ids) >= r["max_new_tokens"] - 6 for x in r["raw"]]  # loop (§2.3.2)
     cells.append(r)
@@ -733,10 +752,11 @@ quantos claims de cada classe viraram abstenção. A cor é relativa ao maior va
 A grade executada vai de −1 a +1 em passos de 0,25 (os valores |α/R| > 1 da grade planejada foram cortados,
 §2.3).""")
 
-code(r"""def cm4(pred, gold):
-    M = np.zeros((4, 4), dtype=int)
+code(r"""PRED = CLS + ["NOLABEL"]                      # regra v2: coluna extra para resposta sem veredito (§3.1.2)
+def cm4(pred, gold):
+    M = np.zeros((4, 5), dtype=int)
     for p, g in zip(pred, gold):
-        M[CLS.index(g), CLS.index(p)] += 1
+        M[CLS.index(g), PRED.index(p)] += 1
     return M
 
 for cond in COND:
@@ -749,10 +769,10 @@ for cond in COND:
         M = cm4(r["pred"], r["gold"]); acc = np.trace(M) / M.sum(); loop = np.mean(r["capped"])
         ax.imshow(M, cmap="Blues", vmin=0, vmax=M.max())
         for a in range(4):
-            for b in range(4):
+            for b in range(5):
                 ax.text(b, a, str(M[a, b]), ha="center", va="center", fontsize=8,
                         color="white" if M[a, b] > .6 * M.max() else "black")
-        ax.set_xticks(range(4)); ax.set_xticklabels(CLS, fontsize=7)
+        ax.set_xticks(range(5)); ax.set_xticklabels(["SUP", "REF", "NEI", "CONF", "no label"], fontsize=7)
         ax.set_yticks(range(4)); ax.set_yticklabels(CLS, fontsize=7)
         ax.set_title(f"α/R = {r['beta']:+.2f} (α = {r['beta'] * 8.375:+.2f})\nacc {acc:.3f} · loop {loop:.0%}", fontsize=8,
                      fontweight="bold" if r["beta"] == 0 else "normal")
@@ -766,8 +786,8 @@ rows = []
 for cond in COND:
     for r in sorted([r for r in cells500 if r["cond"] == cond], key=lambda r: r["beta"]):
         M = cm4(r["pred"], r["gold"])
-        rows.append([COND[cond], r["beta"]] + [M[i, j] for i in range(4) for j in range(4)])
-CM = pd.DataFrame(rows, columns=["condição", "α/R"] + [f"{g}→{p}" for g in CLS for p in CLS]).set_index(["condição", "α/R"])
+        rows.append([COND[cond], r["beta"]] + [M[i, j] for i in range(4) for j in range(5)])
+CM = pd.DataFrame(rows, columns=["condição", "α/R"] + [f"{g}→{p}" for g in CLS for p in PRED]).set_index(["condição", "α/R"])
 display(Markdown("**Tabela das 27 matrizes** — cada coluna `X→Y` = claims com gold X que o modelo rotulou Y."))
 CM""")
 
@@ -841,6 +861,67 @@ else:
                          np.mean([p == g for p, g in zip(fp, fg)]) if fp else np.nan, f"{np.mean(acc):.3f} ± {np.std(acc):.3f}"])
     display(pd.DataFrame(rows, columns=["condição", "α/R", "nº aleatórias", "NEI α=0", "NEI feature 19219", "NEI aleatórias",
                                         "acc feature 19219", "acc aleatórias"]).round(3))""")
+
+md(r"""### 5.4 Gemma-3-4B, feature 12903 (18/10/2026)
+
+Mesmo protocolo (500 claims; 3 condições), com duas diferenças: a dose é medida em $\alpha/R_c$ (norma centrada,
+$R_c = 839$; decisão de 12/10/2026, porque a dimensão 443 do Gemma3 vale ~32.768 em todo token e infla a norma média)
+e a grade vai de −6 a +6 (equivalente, em força relativa, a ±1 na régua antiga do Llama). Rótulo: regra v2 (§3.1.2).""")
+
+code(r"""import glob, collections
+from fcsae.steering.factcheck_sae import verdict_label
+G = "../results/v3_gemma3/steer_sae"
+rows = []
+for cond in ["none", "single", "iterative"]:
+    for f in glob.glob(f"{G}/{cond}__*__b*.json"):
+        if "__all" in f or "__test" in f: continue
+        r = json.load(open(f, encoding="utf-8"))
+        if len(r["ids"]) < 500: continue
+        p = [verdict_label(x) for x in r["raw"]]; c = collections.Counter(p); n = len(p)
+        rows.append([COND[cond], r["beta"], np.mean([a == g for a, g in zip(p, r["gold"])]),
+                     c["SUP"] / n, c["REF"] / n, c["NEI"] / n, c["CONF"] / n, c["NOLABEL"] / n])
+G3 = pd.DataFrame(rows, columns=["condição", "α/R_c", "Acc", "SUP", "REF", "NEI", "CONF", "sem rótulo"])
+G3.sort_values(["condição", "α/R_c"]).set_index(["condição", "α/R_c"]).round(3)""")
+
+md(r"""👉 **Leitura.** A 12903 **controla a abstenção nos dois sentidos**: aumentá-la sobe o NEI nas três condições
+(sem evidência 48% → 96% em +1,5; Single 6% → 60% em +4,5; Iterative 1% → 66% em +4,5); diminuí-la tira a abstenção —
+sem evidência a acurácia **dobra** (0,306 → 0,642 em −3); com evidência o ganho é pequeno (Single 0,590 → 0,608;
+Iterative 0,624 → 0,642), pois o modelo quase não abstém. Faixa útil: −3 a +4,5; em ±6 o texto degenera (~99% sem
+rótulo). Contraste: no Qwen3 a 12482 codifica "não sustentado" (alta em REF e NEI) e só empurra SUP ↔ REF (FAQ 33).""")
+
+md(r"""### 5.5 Qwen3-8B, feature 12482
+
+Mesmo protocolo e mesma grade do Llama (rodada na régua antiga, $\alpha/R$ de −1 a +1 com a norma média
+$R = 131{,}81$); a tabela mostra também a dose convertida para a régua comum, $\alpha/R_c$ ($R_c = 22{,}70$; ×5,81).
+Rótulo: regra v2 (§3.1.2).""")
+
+code(r"""Q = "../results/v3_qwen3_l22/steer_sae"
+qn = json.load(open("/mnt/d/Projetos WSL/fcsae-store/results/v3_qwen3_l22/residual_norm_decision.json"))
+conv = qn["R"] / qn["R_centered"]
+rows = []
+for cond in ["none", "single", "iterative"]:
+    for f in glob.glob(f"{Q}/{cond}__*__b*.json"):
+        if "__all" in f or "__test" in f: continue
+        r = json.load(open(f, encoding="utf-8"))
+        if len(r["ids"]) < 500: continue
+        p = [verdict_label(x) for x in r["raw"]]; c = collections.Counter(p); n = len(p)
+        rows.append([COND[cond], r["beta"], round(r["beta"] * conv, 2), np.mean([a == g for a, g in zip(p, r["gold"])]),
+                     c["SUP"] / n, c["REF"] / n, c["NEI"] / n, c["CONF"] / n, c["NOLABEL"] / n])
+Q3 = pd.DataFrame(rows, columns=["condição", "α/R (régua antiga)", "α/R_c", "Acc", "SUP", "REF", "NEI", "CONF", "sem rótulo"])
+Q3.sort_values(["condição", "α/R_c"]).set_index(["condição", "α/R_c"]).round(3)""")
+
+md(r"""👉 **Leitura.** A 12482 **não controla a abstenção**: ela controla o eixo **"a evidência sustenta / não sustenta"**.
+**Diminuí-la** leva o modelo a responder **SUPPORTED a quase tudo** nas três condições (sem evidência, 100% SUP já em
+α/R_c = −2,90; o modelo chega a escrever *"the task assumes that the evidence is sufficient to support the claim"*);
+**aumentá-la** elimina o SUP e quem cresce é o **REF** — o NEI **não sobe** com evidência (Single 57,0% → 50,6%;
+Iterative 41,6% → 37,6% em +2,90) e sem evidência até cai (29,6% → 11,0%). Nenhuma dose melhora a acurácia com
+evidência.
+
+**Por quê:** a ativação média da 12482 nos dados de treino é quase igual em REF (0,161) e NEI (0,174), contra 0,067 em
+SUP — ela codifica "não sustentado", não "evidência insuficiente". O critério de seleção (NEI × SUP+REF juntos) não
+distingue as duas coisas, porque SUP é o grupo maior (FAQ 33). Contraste: a 19219 (Llama) e a 12903 (Gemma3, §5.4) são
+específicas de NEI e controlam a abstenção nos dois sentidos. É um exemplo de que **detectar ≠ controlar**
+(Arad et al., 2025). Decisão do Lucas (14/10/2026): manter a 12482 (sem refazer a triagem).""")
 
 md(r"""## 6. Limitações previstas
 

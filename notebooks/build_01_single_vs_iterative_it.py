@@ -374,7 +374,10 @@ nf4, geração *greedy*, até 1.536 tokens, `enable_thinking=False` e remoção 
 configurações de `old_method/shared/llm/hf_llm.py` e `shared/config.py` (commit `dc19749`). **A busca de
 evidências e a geração de perguntas não foram refeitas.** Desta vez o **texto completo** da resposta foi
 guardado, e o rótulo é lido como na §7: o **1º rótulo que o modelo escreve**, em maiúsculas e por
-extenso, ignorando enumerações das opções (`first_label` em `fcsae/steering/factcheck_sae.py`).
+extenso, ignorando enumerações das opções. **Atualização 15/10/2026 — regra v2** (`verdict_label` em
+`fcsae/steering/factcheck_sae.py`): tolera erro de grafia no rótulo; abstenção escrita por extenso ("I couldn't find any
+information…") conta como NEI; resposta sem veredito vira "NOLABEL" (erro na acurácia, não conta como NEI). Nas bases
+do RQ1 só o DeepSeek muda (10 de 1.000 respostas).
 
 - Llama: `results/v3_llama/steer_sae/{single,iterative}__none__b+0.00.json` (o α = 0 do steering);
 - demais: `results/replay/<modelo>-hf/{single,iterative}__none__b+0.00.json`
@@ -391,7 +394,7 @@ replay regerou as mesmas respostas. As divergências vêm de respostas longas em
 caminho (em 4 bits, pequenas diferenças numéricas podem mudar o argmax num token e, daí em diante, o
 texto); nesses claims, o rótulo corrigido é o do replay.""")
 
-code(r"""from fcsae.steering.factcheck_sae import first_label, normalize
+code(r"""from fcsae.steering.factcheck_sae import verdict_label, normalize
 RPF = {m: f"../results/replay/{m}-hf" for m in HF}; RPF["llama3.1-8b"] = "../results/v3_llama/steer_sae"
 
 def metrics_from(pred, gold):
@@ -408,7 +411,7 @@ for m in HF:
         r = json.load(open(f"{RPF[m]}/{k}__none__b+0.00.json", encoding="utf-8"))
         rule = [normalize(x) for x in r["raw"]]
         agree = np.mean([a == b for a, b in zip(rule, r["pipeline_pred"])])
-        fx[(m, k)] = {**metrics_from([first_label(x) for x in r["raw"]], r["gold"]), "ids": r["ids"], "pipe": r["pipeline_pred"]}
+        fx[(m, k)] = {**metrics_from([verdict_label(x) for x in r["raw"]], r["gold"]), "ids": r["ids"], "pipe": r["pipeline_pred"]}
         rows.append([NAME[m], k, len(r["raw"]), agree, sum(a != b for a, b in zip(rule, r["pipeline_pred"]))])
 pd.DataFrame(rows, columns=["Modelo", "Método", "claims", "concordância", "divergentes"]).set_index(["Modelo", "Método"]).round(3)""")
 

@@ -1,7 +1,7 @@
 {
-  "name": "fact-checking-abstention-sae-viewer",
+  "name": "fact-checking-nei-sae-viewer",
   "version": "0.1.0",
-  "homepage": "https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer",
+  "homepage": "https://huggingface.co/spaces/lucasfrag/fact-checking-nei-saes-viewer",
   "dependencies": {
     "@headlessui/react": "^1.7.8",
     "@headlessui/tailwindcss": "^0.1.2",

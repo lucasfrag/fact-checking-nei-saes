@@ -11,9 +11,9 @@ and whether suppressing it improves fact-checking on AVeriTeC.
 
 | resource | link |
 |---|---|
-| 🤗 **SAE weights** (SAELens format, one folder per model/layer) | [`lucasfrag/fact-checking-abstention-saes`](https://huggingface.co/lucasfrag/fact-checking-abstention-saes) |
-| 🤗 **Data** (ordered training claims + decision-position activations) | [`lucasfrag/fact-checking-abstention-saes-data`](https://huggingface.co/datasets/lucasfrag/fact-checking-abstention-saes-data) |
-| 🔎 **SAE viewer** (browse every feature: top claims, label histograms, logit effects) | [`lucasfrag/fact-checking-abstention-saes-viewer`](https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer) |
+| 🤗 **SAE weights** (SAELens format, one folder per model/layer) | [`lucasfrag/fact-checking-nei-saes`](https://huggingface.co/lucasfrag/fact-checking-nei-saes) |
+| 🤗 **Data** (ordered training claims + decision-position activations) | [`lucasfrag/fact-checking-nei-saes-data`](https://huggingface.co/datasets/lucasfrag/fact-checking-nei-saes-data) |
+| 🔎 **SAE viewer** (browse every feature: top claims, label histograms, logit effects) | [`lucasfrag/fact-checking-nei-saes-viewer`](https://huggingface.co/spaces/lucasfrag/fact-checking-nei-saes-viewer) |
 | Fact-checking pipeline (Single-step vs. Iterative question generation) | [`lucasfrag/iterative-question-generation`](https://github.com/lucasfrag/iterative-question-generation) |
 
 Part of an MSc dissertation (PPGCC/PUCRS). Status: **work in progress** — the Llama-3.1-8B SAE is released; SAEs for the other models of the Single-step vs. Iterative study
@@ -41,7 +41,7 @@ position in-distribution, so the abstention mechanism can be read off the SAE's 
 
 Feature 19219 (Llama): 93.5% of the 200 claims that activate it most are NEI (4.7× the base rate);
 AUC (NEI vs. SUP/REF) = 0.783; its **magnitude** (not on/off) encodes abstention.
-Browse it in the viewer: [feature 19219](https://lucasfrag-fact-checking-abstention-saes-viewer.static.hf.space/#/model/fact-checking/family/fc_topk_32k/model/llama-3.1-8b-instruct/feature/19219).
+Browse it in the viewer: [feature 19219](https://lucasfrag-fact-checking-nei-saes-viewer.static.hf.space/#/model/fact-checking/family/fc_topk_32k/model/llama-3.1-8b-instruct/feature/19219).
 
 DeepSeek: the first SAE (layer 15) is being redone from scratch, starting from a new layer sweep.
 
@@ -49,7 +49,7 @@ DeepSeek: the first SAE (layer 15) is being redone from scratch, starting from a
 from huggingface_hub import snapshot_download
 from sae_lens import SAE
 
-path = snapshot_download("lucasfrag/fact-checking-abstention-saes", allow_patterns="llama-3.1-8b-instruct/layer-15/*")
+path = snapshot_download("lucasfrag/fact-checking-nei-saes", allow_patterns="llama-3.1-8b-instruct/layer-15/*")
 sae = SAE.load_from_disk(f"{path}/llama-3.1-8b-instruct/layer-15")
 feats = sae.encode(resid)      # raw residual stream at blocks.15.hook_resid_post, shape [..., 4096]
 ```

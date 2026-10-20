@@ -317,7 +317,7 @@ md(r"""## 6. Export para publicação (formato SAELens)
 `SAE.load_from_disk(...)` (ou `SAE.from_pretrained(...)` do HuggingFace Hub), e é o formato que o
 Neuronpedia aceita para os dashboards das features.
 
-**Onde:** `/mnt/d/Projetos WSL/fact-checking-abstention-saes/llama-3.1-8b-instruct/layer-15/` — `cfg.json`,
+**Onde:** `/mnt/d/Projetos WSL/fact-checking-nei-saes/llama-3.1-8b-instruct/layer-15/` — `cfg.json`,
 `sae_weights.safetensors`, `README.md` (model card, em inglês), `fcsae_training_config.json`,
 `export_verification.json`. Código: `fcsae/export/to_saelens.py`.
 
@@ -341,8 +341,8 @@ do resíduo): nos ~0,1% dos tokens em que a 32ª e a 33ª pré-ativação estão
 troca uma feature. Isso está registrado no model card.
 
 **Publicado (privado) no HuggingFace em 28/09/2026:**
-- SAEs: `lucasfrag/fact-checking-abstention-saes` → `llama-3.1-8b-instruct/layer-15/`
-- dados: `lucasfrag/fact-checking-abstention-saes-data` → `llama-3.1-8b-instruct/examples.jsonl` e
+- SAEs: `lucasfrag/fact-checking-nei-saes` → `llama-3.1-8b-instruct/layer-15/`
+- dados: `lucasfrag/fact-checking-nei-saes-data` → `llama-3.1-8b-instruct/examples.jsonl` e
   `decisions.safetensors`
 
 **Verificação a partir do Hub** (download numa pasta limpa):

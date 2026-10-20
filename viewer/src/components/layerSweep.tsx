@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { DATA_BASE } from '../interpAPI'
 
-// Layer sweep: for every layer of each model, how well the abstention direction (mean NEI − mean SUP/REF, no SAE)
+// Layer sweep: for every layer of each model, how well the NEI direction (mean NEI − mean SUP/REF, no SAE)
 // separates NEI from SUP/REF claims on held-out data (AUC). Used to choose the layer where the SAE is trained.
 // Data: viewer/layer_sweeps/<model>.json (fcsae.analysis.layer_sweep).
 type Sweep = {model: string, n_per_class: number, layer_used: number, auc_by_layer: number[], best_layer: number, best_auc: number}
@@ -37,10 +37,10 @@ export default function LayerSweep() {
   }
   return (
     <details className="mt-6">
-      <summary className="text-xl font-bold" style={{cursor: 'pointer'}}>Which layer? Abstention direction AUC by layer</summary>
+      <summary className="text-xl font-bold" style={{cursor: 'pointer'}}>Which layer? NEI direction AUC by layer</summary>
       <p className="text-sm text-gray-700 mt-2 mb-2" style={{maxWidth: 950}}>
         For every layer, we take the difference between the average internal state on NEI claims and on SUP/REF claims
-        (the <b>abstention direction</b>, no SAE) and measure on held-out claims how well it separates the two
+        (the <b>NEI direction</b>, no SAE) and measure on held-out claims how well it separates the two
         (<b>AUC</b>: 0.5 = chance, 1 = perfect). The SAE is trained at a layer where this is high: the
         <span style={{background: '#fff1d6', padding: '0 4px'}}>highlighted</span> row is the layer used, ★ is the best layer.
         Each model "lights up" at a different depth (Qwen3 only from layer ~18). Rule for every model: the layer with the highest AUC

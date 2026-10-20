@@ -29,7 +29,7 @@ export default function FeatureSelect({init_feature, onFeatureChange, onFeatureS
     <h3>
       <b>Model</b>{" "}
       <select value={feature.autoencoder.H.model} onChange={(e) => changeFeature({
-          atom: 0, autoencoder: family.get_ae({...feature.autoencoder.H, model: e.target.value})})}
+          atom: MODELS[e.target.value].feature ?? 0, autoencoder: family.get_ae({...feature.autoencoder.H, model: e.target.value})})}
         className="border border-gray-300 rounded-md p-2" style={{minWidth: 340, marginLeft: 10}}>
         {Object.entries(MODELS).map(([key, m]) => <option key={key} value={key}>{m.label}</option>)}
       </select>

@@ -15,7 +15,7 @@ normalização) é exportado como antes (`normalize_activations="none"`).
 Roda num ambiente que tenha o sae_lens (usamos um venv separado, para não mexer no ambiente
 dos experimentos):
     PYTHONPATH=. ~/venvs/saelens/bin/python -m fcsae.export.to_saelens --preset v3_llama \
-        --out "/mnt/d/Projetos WSL/fact-checking-abstention-saes/llama-3.1-8b-instruct/layer-15" --feat 19219
+        --out "/mnt/d/Projetos WSL/fact-checking-nei-saes/llama-3.1-8b-instruct/layer-15" --feat 19219
 """
 from __future__ import annotations
 
@@ -78,14 +78,14 @@ Gao et al. (2024), *Scaling and evaluating sparse autoencoders*.
 MODEL_CARD_V3 = """---
 license: other
 base_model: {base}
-tags: [sparse-autoencoder, interpretability, mechanistic-interpretability, fact-checking, abstention, sae-lens]
+tags: [sparse-autoencoder, interpretability, mechanistic-interpretability, fact-checking, nei, evidence-sufficiency, sae-lens]
 library_name: sae_lens
 ---
 
 # TopK Sparse Autoencoder — {base_short}, layer {layer} (fact-checking domain)
 
 A domain SAE trained on residual-stream activations of **{base}** (`{hook}`) while the model reads
-fact-checking verdict prompts, to study the model's **abstention** ("NOT ENOUGH EVIDENCE") mechanism.
+fact-checking verdict prompts, to study how the model judges whether the **evidence is enough** to decide (NEI, "NOT ENOUGH EVIDENCE").
 
 ## Architecture and training (following Gao et al., 2024)
 | | |
@@ -106,11 +106,11 @@ fact-checking verdict prompts, to study the model's **abstention** ("NOT ENOUGH 
 | FVU at the decision position (raw space, variance across decisions) | {fvu_dec_raw} |
 | L0 | {l0:.1f} |
 
-## Abstention feature
+## NEI feature
 {feat_block}
 
 ## Browse the features
-Interactive viewer: [lucasfrag/fact-checking-abstention-saes-viewer](https://huggingface.co/spaces/lucasfrag/fact-checking-abstention-saes-viewer).
+Interactive viewer: [lucasfrag/fact-checking-nei-saes-viewer](https://huggingface.co/spaces/lucasfrag/fact-checking-nei-saes-viewer).
 
 ## Usage
 ```python
@@ -164,7 +164,7 @@ def run(preset_name: str, out_dir: str | None, verify: bool, feat: int | None, n
         model_name=base, hook_name=hook, hook_layer=cfg.layer,
         prepend_bos=True, dataset_path=",".join(cfg.datasets),
         context_size=cfg.max_seq_len,
-        description=f"TopK domain SAE (fact-checking) for abstention study; layer {cfg.layer}; "
+        description=f"TopK domain SAE (fact-checking) for the study of NEI (evidence not enough); layer {cfg.layer}; "
                     f"activations from the 4-bit NF4 base model",
     )
     sae_cfg = TopKSAEConfig(
@@ -252,16 +252,16 @@ def run(preset_name: str, out_dir: str | None, verify: bool, feat: int | None, n
             d_pos = [x["feat"] for x in ab.get("top_feats_cohens_d", []) if x["d"] > 0]
             why = []
             if cos_rank[:1] == [feat]:
-                why.append("the feature most aligned with the diff-of-means abstention direction")
+                why.append("the feature most aligned with the diff-of-means NEI direction")
             if d_rank[:1] == [feat]:
                 why.append("the one with the largest Cohen's d between NEI and SUP/REF decisions")
             elif d_pos[:1] == [feat]:
                 why.append(f"the one with the largest positive Cohen's d between NEI and SUP/REF decisions (the largest |d|, "
                            f"feature {d_rank[0]}, is negative: it fires more on SUP/REF)")
-            why_txt = " and ".join(why) if why else "selected by Cohen's d and cosine with the abstention direction"
-            feat_block = (f"Feature **{feat}** is the candidate abstention feature: it is {why_txt}. Among the 200 claims that activate it most, **{100*fe['nei_top200']:.1f}%** "
+            why_txt = " and ".join(why) if why else "selected by Cohen's d and cosine with the NEI direction"
+            feat_block = (f"Feature **{feat}** is the candidate NEI feature: it is {why_txt}. Among the 200 claims that activate it most, **{100*fe['nei_top200']:.1f}%** "
                           f"are NEI (base rate {100*fe['nei_base']:.1f}%; {fe['enrich_top200']:.1f}×); AUC(NEI vs. "
-                          f"SUP/REF) = {fe['auc_feature_topk']:.3f}. Its **magnitude** (not on/off) encodes abstention: it is "
+                          f"SUP/REF) = {fe['auc_feature_topk']:.3f}. Its **magnitude** (not on/off) encodes NEI: it is "
                           f"active on {100*fe['frac_active']:.0f}% of decision positions.")
         else:
             feat_block = "See the accompanying repository."
@@ -270,13 +270,13 @@ def run(preset_name: str, out_dir: str | None, verify: bool, feat: int | None, n
             sp = json.load(open(spf)); a, cv = sp["auc_by_k"], sp["direction_coverage_by_k"]
             spread = cv["1"] < 0.5
             feat_block += (
-                "\n\n**How concentrated is abstention in this SAE?** Separation of NEI vs. SUP/REF (held-out AUC of a logistic "
-                "probe) using only the k features with the largest |Cohen's d|, and the fraction of the diff-of-means abstention "
+                "\n\n**How concentrated is the NEI signal in this SAE?** Separation of NEI vs. SUP/REF (held-out AUC of a logistic "
+                "probe) using only the k features with the largest |Cohen's d|, and the fraction of the diff-of-means NEI "
                 "direction covered by the k most aligned decoder rows:\n\n"
                 "| k features | 1 | 5 | 10 | all |\n|---|---|---|---|---|\n"
                 f"| AUC | {a['1']:.3f} | {a['5']:.3f} | {a['10']:.3f} | {sp['auc_all_features']:.3f} |\n"
                 f"| direction coverage | {cv['1']:.0%} | {cv['5']:.0%} | {cv['10']:.0%} | — |\n\n"
-                + ("In this SAE abstention is **spread over several features** (the top features by |d| are "
+                + ("In this SAE the NEI signal is **spread over several features** (the top features by |d| are "
                    + ", ".join(f"{f} ({d:+.2f})" for f, d in sp["top_features_by_abs_d"][:5])
                    + "; positive d = stronger on NEI) rather than concentrated in one. Feature splitting/absorption "
                    "(Bricken et al., 2023; Chanin et al., 2024) and seed dependence (Paulo & Belrose, 2025) can produce "

@@ -14,14 +14,15 @@ const COLS: {key: Key, label: string, tip: string}[] = [
   {key: 'rank', label: 'candidate', tip: "Position when all features are ranked by |Cohen's d| (how the candidates were picked)"},
   {key: 'atom', label: 'feature', tip: 'Feature number (click a row to open it)'},
   {key: 'd', label: "Cohen's d", tip: 'Separation NEI vs SUP/REF in standard deviations; positive = fires more on NEI claims'},
-  {key: 'cos', label: 'cosine', tip: 'Alignment of the feature direction with the abstention direction (1 same, 0 unrelated, −1 opposite)'},
+  {key: 'cos', label: 'cosine', tip: 'Alignment of the feature direction with the NEI direction (1 same, 0 unrelated, −1 opposite)'},
   {key: 'auc', label: 'AUC', tip: 'Link score NEI vs SUP/REF from this feature alone (0.5 = no link); approximate, from histograms'},
   {key: 'top20', label: 'NEI in top 20', tip: 'Share of NEI among the 20 claims that activate it most (average 20%)'},
   {key: 'freq', label: 'appears in', tip: 'Share of answers in which the feature fires at the verdict'},
   {key: 'steer', label: 'steering', tip: 'Result of pushing the model along this feature (only the tested ones)'},
 ]
 
-export default function CandidatesTable({path, steering, onSelect}: {path: string, steering: {[atom: number]: Verdict}, onSelect: (atom: number) => void}) {
+export default function CandidatesTable({path, steering, chosen, onSelect}: {path: string, steering: {[atom: number]: Verdict}, chosen?: number,
+                                         onSelect: (atom: number) => void}) {
   const [rows, setRows] = useState(null as Row[] | null)
   const [sort, setSort] = useState({key: 'rank' as Key, asc: true})
   const [n, setN] = useState(25)
@@ -54,7 +55,8 @@ export default function CandidatesTable({path, steering, onSelect}: {path: strin
     <div className="mt-3">
       <h3 className="text-md font-bold mb-1">All features, ranked</h3>
       <p className="text-sm text-gray-600 mb-1">Click a column title to sort (again to reverse). Candidates are ranked by |Cohen's d|;
-        the tested ones show their steering result.
+        the tested ones show their steering result. The <span style={{background: '#fff1d6', padding: '0 4px'}}>highlighted</span> row is the
+        chosen feature (★).
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="find feature #" className="border border-gray-300 rounded-md ml-2 px-2"
           style={{width: 130}}/></p>
       <table className="text-sm" style={{borderCollapse: 'collapse'}}>
@@ -68,9 +70,10 @@ export default function CandidatesTable({path, steering, onSelect}: {path: strin
         <tbody>
           {shown.slice(0, n).map((r) => (
             <tr key={r.atom} onClick={() => onSelect(r.atom)} style={{borderBottom: '1px solid #eee', cursor: 'pointer',
-                background: r.steer ? '#fff8ec' : undefined}}>
+                background: r.atom === chosen ? '#fff1d6' : r.steer ? '#fff8ec' : undefined, fontWeight: r.atom === chosen ? 700 : undefined}}>
               <td className="px-2 center">{r.rank}°</td>
-              <td className="px-2 center text-blue-600">#{r.atom}</td>
+              <td className="px-2 center text-blue-600" style={{whiteSpace: 'nowrap'}}>#{r.atom}{r.atom === chosen &&
+                <span title="the chosen feature (first on cosine and on Cohen's d among features that fire more on NEI)" style={{color: '#b35c00', fontSize: 11}}> ★ chosen</span>}</td>
               <td className="px-2 center">{r.d.toFixed(3)}</td>
               <td className="px-2 center">{r.cos.toFixed(3)}</td>
               <td className="px-2 center">{r.auc === null ? '—' : r.auc.toFixed(3)}</td>

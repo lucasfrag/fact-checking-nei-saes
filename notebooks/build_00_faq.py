@@ -47,6 +47,12 @@ perguntas novas entram no fim.
 29. [O que deu errado no treino do SAE do Gemma3 (perda "nan") e como foi corrigido?](#29)
 30. ["Ativação" do modelo × ativação de uma feature: de onde até onde vai cada número?](#30)
 31. [Por que a dose do steering passou a usar a norma centrada ($R_c$) e não a norma média?](#31)
+32. ["Resíduo" é o mesmo que *residual stream*?](#32)
+33. [Por que a feature do Qwen3 (12482) gera REF/SUP no steering, e não NEI? Fizemos algo errado?](#33)
+34. [No viewer, por que só os "top 20" e por que "not shown: 17.614 claims"? Esses dados são ignorados?](#34)
+35. [Como a literatura escolhe a feature de um SAE para um comportamento? E o nosso método?](#35)
+36. [De onde até onde vão o d de Cohen, o cosseno e a AUC?](#36)
+37. [O que o steering da feature 12903 mostrou no Gemma3?](#37)
 
 > **Atualização 27/09/2026:** o SAE principal agora é o **v3** (ver `02-sae-v3.ipynb`). As
 > respostas 1, 3 e 5 foram atualizadas; as 7–10 são novas.
@@ -966,6 +972,7 @@ regra) — não interpretar o NEI dessas células.
 
 > Dados: `results/v3_qwen3_l22/steer_sae/`; viewer: página da feature 12482 (Qwen3-8B · layer 22), tabela por dose e
 > "browse all 500 claims".
+> Tabela completa (grade inteira, regra de rótulo v2, dose também em α/R_c): **nb03 §5.5**.
 """)
 
 md(r"""<a id="29"></a>
@@ -1048,6 +1055,111 @@ $\alpha/R$ com a norma média empurraria o Gemma3 muito mais, em relação à su
 Llama e Qwen3 foram rodados com a norma média (−1 a +1); a conversão é exata (×5,2 e ×5,8), sem refazer nada. Gemma3:
 grade 0, ±1,5, ±3, ±4,5, ±6 em $\alpha/R_c$. Texto na dissertação: Metodologia, seção de Activation Steering
 (Tabela `tab:steering_scale`). Código: `residual_norm(cfg, kind)` e `--norm centered` em `fcsae/steering/factcheck_sae.py`.
+""")
+
+md(r"""<a id="32"></a>
+## 32. "Resíduo" é o mesmo que *residual stream*?
+
+Sim. "Resíduo" foi usado como abreviação de ***residual stream*** ("*stream* residual" na dissertação): o vetor de cada
+posição que atravessa o modelo da entrada à saída; cada camada lê dele e **soma** a sua contribuição (conexão residual;
+Elhage et al., 2021). É nele que as ativações do SAE são coletadas e é nele que o steering soma a direção da feature.
+A "dimensão do resíduo" $d$ é o tamanho desse vetor: 4.096 (Llama, Qwen3, DeepSeek, Ministral) e 2.560 (Gemma3, Gemma4);
+o dicionário do SAE tem $8 \times d$ features. Daqui em diante: usar "*residual stream*" (preferência do Lucas, 14/10/2026).
+""")
+
+md(r"""<a id="33"></a>
+## 33. Por que a feature do Qwen3 (12482) gera REF/SUP no steering, e não NEI? Fizemos algo errado?
+
+Não foi erro de código: a 12482 codifica **"a alegação não é sustentada"** (REF **ou** NEI), e não a abstenção em si.
+Ativação média por rótulo-ouro (598.930 decisões de treino):
+
+| feature | SUP | REF | NEI | REF ÷ SUP | NEI ÷ SUP |
+|---|---|---|---|---|---|
+| Llama 19219 | 0,059 | 0,072 | **0,126** | 1,2 | **2,1** |
+| **Qwen3 12482** | 0,067 | **0,161** | **0,174** | **2,4** | 2,6 |
+| Gemma3 12903 | 0,0073 | 0,0082 | **0,0120** | 1,1 | **1,6** |
+
+19219 e 12903 são específicas de NEI (e controlam o NEI nos dois sentidos); a 12482 dispara quase igual em REF e NEI —
+por isso, no steering, diminuí-la leva tudo a SUPPORTED e aumentá-la troca SUP por REF. O padrão é o mesmo no VitaminC
+e no FEVER (não é artefato de um conjunto).
+
+**Por que ela foi escolhida:** o critério compara NEI × (SUP+REF) juntos; como SUP é o grupo maior, uma feature de "não
+sustentado" ainda tem d de Cohen alto — a própria direção de abstenção (diff-of-means) carrega esse viés. Um critério
+mais específico seria o menor entre d(NEI×SUP) e d(NEI×REF). **Decisão do Lucas (14/10/2026): manter a 12482 e não
+refazer a triagem.** Para a dissertação: exemplo de que detecção ≠ controle (Arad et al., 2025) e de uma limitação do
+critério de seleção.
+""")
+
+md(r"""<a id="34"></a>
+## 34. No viewer, por que só os "top 20" e por que "not shown: 17.614 claims"? Esses dados são ignorados?
+
+Não são ignorados nas análises.
+
+- **"Not shown: N claims where it does not fire"** = claims com ativação **exatamente 0** (a feature não ficou entre as
+  32 do TopK naquele claim). Na 19219 são 17.614 de 598.930 (2,9%). Ficam fora do **desenho** porque, tendo todos o
+  mesmo valor (0), virariam uma "torre" em x = 0 que esmaga a escala das curvas. **AUC, d de Cohen e NEI no top-200 usam
+  os 598.930 claims** (com 0 nesses casos).
+- **Top 20** = exemplos para **ler** (inspeção qualitativa), convenção dos viewers de SAE (sae-viewer da OpenAI,
+  Neuronpedia). Guardar os 598.930 claims × 32.768 features seria inviável numa página web. As curvas/histogramas usam
+  todos os claims em que a feature dispara; as métricas de seleção usam todos os claims.
+""")
+
+md(r"""<a id="35"></a>
+## 35. Como a literatura escolhe a feature de um SAE para um comportamento? E o nosso método?
+
+**Nosso método:** (1) **escolha** = 1º no cosseno com a direção de abstenção e 1º no d de Cohen (NEI × SUP/REF);
+(2) **caracterização** = AUC, % de NEI no top-200 e leitura dos exemplos (não entram na escolha); (3) **confirmação
+causal** = steering.
+
+| abordagem | o que faz | exemplos |
+|---|---|---|
+| 1. Contraste entre grupos | ativação da feature em dois conjuntos; escolhe as que mais separam | Ferrando et al. (2025): *separation score* conhecidas × desconhecidas — **= nosso d de Cohen** |
+| 2. Alinhamento com direção | cosseno decoder × direção de diferença de médias | decomposição de direções como a de recusa (Arditi et al., 2024) — **= nosso cosseno** |
+| 3. Sondas esparsas | classificador linear esparso sobre as features; melhor feature sozinha ("1D probe") | Gao et al. (2024); Kantamneni et al. (2025); Gurnee et al. (2023) |
+| 4. Atribuição (efeito na saída) | *attribution patching*: efeito de cada feature numa métrica da saída (ex.: logit de NEI) | Marks et al. (2024), *Sparse Feature Circuits* |
+| 5. Descrição / inspeção | exemplos que mais ativam; descrições automáticas por LLM | Bricken et al. (2023); Bills et al. (2023); Paulo et al. (2024) |
+
+**Lições:** Arad et al. (2025) — detectar ≠ controlar; para controle, critérios de efeito na saída (tipo 4) tendem a ser
+melhores (é o caso da 12482 do Qwen3; pergunta 33). AxBench (Wu et al., 2025) — para steering, diff-of-means costuma
+ser competitiva com features de SAE. Nosso método (1+2, confirmado por steering) é padrão; a abordagem 4 fica como
+trabalho futuro/limitação.
+""")
+
+md(r"""<a id="36"></a>
+## 36. De onde até onde vão o d de Cohen, o cosseno e a AUC?
+
+| medida | vai de | "sem relação" | sinal / extremos |
+|---|---|---|---|
+| AUC | 0 a 1 | 0,5 | 1 = separa NEI perfeitamente; 0 = separa ao contrário |
+| cosseno | **−1 a 1** | 0 | 1 = mesma direção da abstenção; −1 = oposta ("espelho") |
+| d de Cohen | **sem limite** (−∞ a +∞) | 0 | + = dispara mais em NEI; − = mais em SUP/REF |
+
+O d é a diferença de médias em **desvios padrão**; leitura usual (Cohen, 1988): 0,2 pequeno, 0,5 médio, 0,8 grande.
+Nossos valores: 1,276 (Llama 19219), 1,078 (Qwen3 12482), 0,928 (Gemma3 12903) — todos "grandes".
+Com dois grupos normais, **AUC ≈ Φ(d/√2)**: d = 0,5 → 0,64; 0,8 → 0,71; 1,276 → 0,82 (medida na 19219: 0,783; as
+ativações são ≥ 0 e assimétricas, não normais).
+""")
+
+md(r"""<a id="37"></a>
+## 37. O que o steering da feature 12903 mostrou no Gemma3?
+
+Grade completa (27 células; 500 claims do AVeriTeC dev; dose em $\alpha/R_c$, $R_c = 839$; regra de rótulo v2):
+
+| α/R_c | sem evidência: acc · NEI | Single: acc · NEI | Iterative: acc · NEI |
+|---|---|---|---|
+| −3 | **0,642** · 1,6% | 0,606 · 5,8% | **0,642** · 1,6% |
+| −1,5 | 0,592 · 7,6% | **0,608** · 4,0% | 0,628 · 0,6% |
+| **0** | **0,306 · 48,0%** | **0,590 · 6,2%** | **0,624 · 0,8%** |
+| +1,5 | 0,104 · 96,0% | 0,530 · 15,2% | 0,602 · 3,0% |
+| +3 | 0,056 · 71,4% | 0,466 · 32,0% | 0,478 · 25,6% |
+| +4,5 | 0,170 · 47,6% | 0,272 · 59,8% | 0,254 · 66,2% |
+| ±6 | texto quebrado (~99% sem rótulo) | idem | idem |
+
+**Leitura:** a 12903 **controla a abstenção nos dois sentidos** (como a 19219 do Llama e ao contrário da 12482 do
+Qwen3): aumentá-la sobe o NEI nas três condições; diminuí-la tira a abstenção — sem evidência a acurácia **dobra**
+(0,306 → 0,642); com evidência o ganho é pequeno (0,590 → 0,608; 0,624 → 0,642) porque o Gemma3 quase não abstém.
+Faixa útil −3 a +4,5; em ±6 o texto degenera. **Veredito no viewer (Lucas, 18/10/2026): "✓ controls abstention".**
+Detalhes: nb03 §5.4.
 """)
 
 nb = new_notebook(cells=cells, metadata={

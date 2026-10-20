@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { normalizeSequences, Feature, FeatureInfo, SteeringInfo } from "../types"
 import TokenHeatmap from "./tokenHeatmap";
 import Histogram, { bandSummary } from "./histogram"
+import ClassDistributions from "./classDistributions"
 import Tooltip from "./tooltip"
 import { get_feature_info, get_steering } from "../interpAPI"
 import { pathForFeature, STEERED } from "../autoencoder_registry"
@@ -106,8 +107,23 @@ export default ({ feature }: {feature: Feature}) => {
         </ul>
       </details>
       <div style={{maxWidth: 950}}>
-        <h3 className="text-md font-bold">Is the evidence insufficient when this feature fires strongly?</h3>
-        <p className="text-sm mb-1"><b>{bandSummary(data)}</b></p>
+        <h3 className="text-md font-bold">How strongly does this feature fire on NEI claims vs SUP/REF claims?</h3>
+        {fc && (() => {
+          const hb = data.hist_by_label
+          if (!hb) return null
+          const m = (c: number[]) => { const t = c.reduce((a, b) => a + b, 0) || 1
+            return c.reduce((a, v, i) => a + v * (hb.edges[i] + hb.edges[i + 1]) / 2, 0) / t }
+          const mN = m(hb['NEI'] || []), mD = m(hb['SUP/REF'] || []), r = mN / (mD || 1)
+          return <p className="text-sm mb-1">Each curve shows how the activations of one group of claims are spread.{' '}
+            {r >= 1 ? <>The <b style={{color: '#e8772e'}}>orange</b> curve is further to the right: this feature fires <b>more strongly when the
+              evidence is not enough</b> (on average {r.toFixed(1)}× as strongly as on SUP/REF claims).</>
+             : <>The <b style={{color: '#2a78d6'}}>blue</b> curve is further to the right: this feature fires <b>more strongly when the evidence
+              is enough</b> to decide (on average {(1 / r).toFixed(1)}× as strongly as on NEI claims).</>}</p>
+        })()}
+        {fc && <div style={{height: '300px', maxWidth: 950}}><ClassDistributions data={data}/></div>}
+        <details className="mt-2">
+        <summary className="text-sm" style={{cursor: 'pointer'}}>More detail: share of NEI by how strongly the feature fires</summary>
+        <p className="text-sm mb-1 mt-2"><b>{bandSummary(data)}</b></p>
         {fc &&
           <div className="text-sm text-gray-700 mb-1" style={{display: 'flex', gap: 18, flexWrap: 'wrap'}}>
             <Tooltip content={<span>fires on <b>{pct(fc.frac_active)}</b> of answers</span>} tooltip={'share of all verdicts where the feature is active (> 0)'}/>
@@ -116,6 +132,7 @@ export default ({ feature }: {feature: Feature}) => {
               tooltip={'chance that a random NEI claim activates it more than a random SUP/REF claim (0.5 = no link; below 0.5 = fires more on SUP/REF claims)'}/>
           </div>}
         <div style={{height: '320px'}}><Histogram data={data} /></div>
+        </details>
       </div>
       {(data.logits || data.neighbors) &&
         <details className="mt-2 mb-3 text-sm">

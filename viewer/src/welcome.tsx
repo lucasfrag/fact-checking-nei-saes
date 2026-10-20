@@ -2,35 +2,36 @@ import React, { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Feature, FeatureIndex, FeatureIndexEntry } from "./types"
 import FeatureSelect from "./components/featureSelect"
+import SteeringScale from "./components/steeringScale"
 import FeatureMap from "./components/featureMap"
 import SelectionMethod from "./components/selectionMethod"
 import SelectionScatter from "./components/selectionScatter"
 import CandidatesTable, { Verdict } from "./components/candidatesTable"
 import LayerSweep from "./components/layerSweep"
-import { pathForFeature, DEFAULT_AUTOENCODER } from "./autoencoder_registry"
+import { pathForFeature, DEFAULT_AUTOENCODER, MODELS } from "./autoencoder_registry"
 import { get_index } from "./interpAPI"
 
 // Features highlighted in the accompanying study (per model folder).
 const HIGHLIGHTED: {[path: string]: {atom: number, label: string, description: string}[]} = {
   'llama-3.1-8b-instruct/layer-15': [
-    {atom: 19219, label: '19219: the abstention feature', description: 'Steering CONFIRMED: turning it down makes the model decide; turning it up makes it say "not enough evidence".'},
+    {atom: 19219, label: '19219: the NEI feature', description: 'Steering CONFIRMED: turning it down makes the model decide; turning it up makes it say "not enough evidence".'},
     {atom: 14953, label: '14953: the mirror case', description: 'Fires more on SUP/REF claims (evidence enough to decide). Not tested with steering.'},
   ],
   'qwen3-8b/layer-22': [
-    {atom: 12482, label: '12482: the abstention candidate', description: 'Top feature on BOTH selection criteria (Cohen\'s d and cosine), as 19219 in Llama. Steering results on its page: turning it down makes the model answer SUPPORTED to almost everything.'},
+    {atom: 12482, label: '12482: the NEI candidate', description: 'Top feature on BOTH selection criteria (Cohen\'s d and cosine), as 19219 in Llama. Steering results on its page: turning it down makes the model answer SUPPORTED to almost everything.'},
     {atom: 21289, label: '21289: the mirror case', description: 'Fires more on SUP/REF claims (evidence enough to decide). Not tested with steering.'},
   ],
   'gemma-3-4b-it/layer-19': [
-    {atom: 12903, label: '12903: the abstention candidate', description: 'Top on cosine and on positive Cohen\'s d; pushes the output towards "Depends", "somewhat", "maybe". Steering not run yet.'},
+    {atom: 12903, label: '12903: the NEI candidate', description: 'Top on cosine and on positive Cohen\'s d; pushes the output towards "Depends", "somewhat", "maybe". Steering CONFIRMED: turning it down removes NEI answers (accuracy without evidence doubles); turning it up makes the model say "not enough evidence".'},
     {atom: 2170, label: '2170: the mirror case', description: 'Largest |Cohen\'s d|, but negative: fires more on SUP/REF claims (evidence enough to decide).'},
   ],
   // DeepSeek: abstention is spread over several features in this SAE; steering results without evidence (FAQ 22)
   'deepseek-r1-distill-llama-8b/layer-15': [
-    {atom: 18658, label: '18658: controls abstention', description: 'Steering CONFIRMED in both directions, with the widest range without breaking the model.'},
-    {atom: 32642, label: '32642: controls abstention', description: 'Steering CONFIRMED in both directions.'},
-    {atom: 25349, label: '25349: controls abstention (mirror)', description: 'Steering CONFIRMED: turning it UP makes the model abstain LESS.'},
-    {atom: 19789, label: '19789: partial (mirror)', description: 'Steering: only turning it up has an effect (less abstention).'},
-    {atom: 7531, label: '7531: no control', description: 'Strongest link score, but steering it does NOT change abstention: a link is not the same as control.'},
+    {atom: 18658, label: '18658: controls NEI', description: 'Steering CONFIRMED in both directions, with the widest range without breaking the model.'},
+    {atom: 32642, label: '32642: controls NEI', description: 'Steering CONFIRMED in both directions.'},
+    {atom: 25349, label: '25349: controls NEI (mirror)', description: 'Steering CONFIRMED: turning it UP makes the model answer NEI LESS.'},
+    {atom: 19789, label: '19789: partial (mirror)', description: 'Steering: only turning it up has an effect (less NEI).'},
+    {atom: 7531, label: '7531: no control', description: 'Strongest link score, but steering it does NOT change NEI: a link is not the same as control.'},
   ],
 }
 
@@ -41,13 +42,14 @@ const NOTES: {[path: string]: {map?: string, highlighted?: string}} = {
   'gemma-3-4b-it/layer-19': {map: 'Weaker signal than Llama and Qwen3: 12903 leads on cosine, and the largest |d| belongs to a mirror feature (2170).'},
   'deepseek-r1-distill-llama-8b/layer-15': {
     map: 'Here no single star stands far above the rest: the signal is shared by several features.',
-    highlighted: 'In DeepSeek no single feature does the whole job: several features each carry part of the "not enough evidence" signal. Steering showed that the feature with the strongest link (7531) does not control abstention, while three others do (18658, 32642, 25349).',
+    highlighted: 'In DeepSeek no single feature does the whole job: several features each carry part of the "not enough evidence" signal. Steering showed that the feature with the strongest link (7531) does not control NEI, while three others do (18658, 32642, 25349).',
   },
 }
 
 // steering results (Llama: nb03; DeepSeek: FAQ 22, without evidence)
 const STEERING: {[path: string]: {[atom: number]: Verdict}} = {
   'llama-3.1-8b-instruct/layer-15': {19219: 'controls'},
+  'gemma-3-4b-it/layer-19': {12903: 'controls'},
   'deepseek-r1-distill-llama-8b/layer-15': {7531: 'no', 32642: 'controls', 18658: 'controls', 25349: 'controls', 19789: 'partial'},
 }
 
@@ -71,15 +73,15 @@ export default function Welcome() {
 
   return (
     <div className="flex flex-col" style={{padding: '40px 60px', maxWidth: 1100}}>
-      <h1 className="text-2xl font-bold mb-2">Fact-Checking Abstention SAE Viewer</h1>
+      <h1 className="text-2xl font-bold mb-2">Fact-Checking NEI SAE Viewer</h1>
       <p className="mb-2">
         Features of <b>domain TopK sparse autoencoders</b> trained on the residual stream of instruction-tuned LLMs while they
-        read <b>fact-checking verdict prompts</b> (claim + evidence + instructions), to study <b>abstention</b>{" "}
-        ("NOT ENOUGH EVIDENCE"). Statistics are computed at the <b>decision position</b> over {index ? index.meta.n_decisions.toLocaleString() : '…'} claims.
+        read <b>fact-checking verdict prompts</b> (claim + evidence + instructions), to study <b>when the model judges the evidence is not
+        enough</b> to decide (NEI, "NOT ENOUGH EVIDENCE"). Statistics are computed at the <b>decision position</b> over {index ? index.meta.n_decisions.toLocaleString() : '…'} claims.
       </p>
       <p className="mb-4 text-sm">
-        SAEs: <a className="text-blue-500" href="https://huggingface.co/lucasfrag/fact-checking-abstention-saes">lucasfrag/fact-checking-abstention-saes</a> ·
-        data: <a className="text-blue-500" href="https://huggingface.co/datasets/lucasfrag/fact-checking-abstention-saes-data">lucasfrag/fact-checking-abstention-saes-data</a> ·
+        SAEs: <a className="text-blue-500" href="https://huggingface.co/lucasfrag/fact-checking-nei-saes">lucasfrag/fact-checking-nei-saes</a> ·
+        data: <a className="text-blue-500" href="https://huggingface.co/datasets/lucasfrag/fact-checking-nei-saes-data">lucasfrag/fact-checking-nei-saes-data</a> ·
         viewer adapted from <a className="text-blue-500" href="https://github.com/openai/sparse_autoencoder/tree/main/sae-viewer">OpenAI's sae-viewer</a> (MIT).
       </p>
       <FeatureSelect init_feature={feature} onFeatureChange={(f: Feature) => setFeature(f)}
@@ -98,8 +100,10 @@ export default function Welcome() {
 
       <SelectionMethod selectedPath={feature.autoencoder.path} onSelect={go}/>
       <SelectionScatter path={feature.autoencoder.path} highlighted={highlighted} onSelect={go}/>
-      <CandidatesTable path={feature.autoencoder.path} steering={STEERING[feature.autoencoder.path] || {}} onSelect={go}/>
+      <CandidatesTable path={feature.autoencoder.path} steering={STEERING[feature.autoencoder.path] || {}}
+        chosen={MODELS[feature.autoencoder.path.split('/')[0]]?.feature} onSelect={go}/>
       <LayerSweep/>
+      <SteeringScale/>
 
       {index &&
         <div className="mt-6">

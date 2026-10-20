@@ -6,10 +6,10 @@ import { SteeringInfo, SteeringAll } from '../types'
 
 // "Browse all claims" of a steering experiment: one row per claim with the verdict at every dose (α/R) side by side;
 // click a row to see the model's answer at each dose. Data: viewer/<path>/steering/<atom>_all_<cond>.json.
-const LABEL_COLORS: {[key: string]: string} = {NEI: '#f0883e', SUP: '#2a9d5c', REF: '#d9534f', CONF: '#7a5cc4'}
+const LABEL_COLORS: {[key: string]: string} = {NEI: '#f0883e', SUP: '#2a9d5c', REF: '#d9534f', CONF: '#7a5cc4', NOLABEL: '#9aa0a6'}
 const Badge = ({label, faded}: {label: string, faded?: boolean}) => (
   <span style={{background: LABEL_COLORS[label] || '#999', color: 'white', borderRadius: 3, padding: '1px 5px',
-                fontWeight: 'bold', fontSize: 11, opacity: faded ? 0.35 : 1}}>{label}</span>)
+                fontWeight: 'bold', fontSize: 11, opacity: faded ? 0.35 : 1}}>{label === 'NOLABEL' ? 'no label' : label}</span>)
 const tab = (on: boolean) => on ? {background: '#dbeafe', borderColor: '#2a78d6', borderWidth: 2, fontWeight: 700} : {background: '#ffffff'}
 const fmt = (b: number) => (b > 0 ? '+' : '') + b.toFixed(2)
 const PAGE = 50
@@ -59,7 +59,7 @@ export default function SteeringBrowser() {
       <Link className="text-blue-500 hover:text-blue-700 text-sm" to={featurePage}>← back to feature {feat}</Link>
       <h1 className="text-2xl font-bold mt-1">Steering feature {feat}: all {info.n_claims} claims</h1>
       <p className="text-sm text-gray-700 mt-1 mb-2" style={{maxWidth: 1000}}>
-        {MODELS[model as string]?.label}. Each row is one AVeriTeC claim; the colored badges are the model's verdict at each dose α/R
+        {MODELS[model as string]?.label}. Each row is one AVeriTeC claim; the colored badges are the model's verdict at each dose α/R_c
         (left = feature decreased, right = increased; the gray column is the unmodified model). Click a row to read the model's answer
         at every dose.
       </p>
@@ -107,7 +107,7 @@ export default function SteeringBrowser() {
                           {r.evidence.map((e, i) => <li key={i}>{e.text}{e.url ? <> (<a className="text-blue-500" href={e.url} target="_blank" rel="noreferrer">source</a>)</> : null}</li>)}
                         </ul></div>}
                     <table className="activations-table" style={{fontSize: 12}}>
-                      <thead><tr><th>α/R</th><th>Verdict</th><th>Model output (truncated)</th></tr></thead>
+                      <thead><tr><th>α/R<sub>c</sub></th><th>Verdict</th><th>Model output (truncated)</th></tr></thead>
                       <tbody>
                         {data.betas.map((b, k) => (
                           <tr key={b} style={b === 0 ? {background: '#f3f3f3'} : {}}>

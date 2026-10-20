@@ -12,7 +12,7 @@ type Props = {index: FeatureIndex, highlighted: HL[], onSelect: (atom: number) =
 
 const pctStr = (f: number) => f >= 0.01 ? `${(100 * f).toFixed(0)}%` : f >= 0.0001 ? `${(100 * f).toFixed(2)}%` : '<0.01%'
 const zone = (auc: number) => auc >= 0.55 ? 'fires more on <b>NEI</b> claims (evidence not enough)'
-  : auc <= 0.45 ? 'fires more on <b>SUP/REF</b> claims (evidence enough to decide)' : 'no clear link to abstention'
+  : auc <= 0.45 ? 'fires more on <b>SUP/REF</b> claims (evidence enough to decide)' : 'no clear link to NEI'
 
 export default function FeatureMap({index, highlighted, onSelect}: Props) {
   const fs = index.features.filter((f) => f.auc !== null)
