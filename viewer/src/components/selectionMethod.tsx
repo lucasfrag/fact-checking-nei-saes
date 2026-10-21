@@ -2,15 +2,14 @@ import React, { useState } from 'react'
 
 // "How the NEI feature was chosen": a short card for the SELECTED model (the chart below shows all features).
 // Each number explains itself on hover. Values: results/<preset>/abstention.json and feature_<id>_examples.json;
-// steering verdicts: nb03 (Llama) and FAQ 22 (DeepSeek, without evidence); Qwen3: steering pending.
+// steering verdicts: nb03.
 type Card = {feature: number, d: number, cos: number, top200: number, controls: boolean | null, steering: string, others?: number[]}
 const CARDS: {[path: string]: Card} = {
   'llama-3.1-8b-instruct/layer-15': {feature: 19219, d: 1.276, cos: 0.716, top200: 0.935, controls: true,
     steering: 'controls NEI'},
-  'deepseek-r1-distill-llama-8b/layer-15': {feature: 7531, d: 0.68, cos: 0.35, top200: 0.535, controls: false,
-    steering: 'no control', others: [18658, 32642, 25349]},
   'qwen3-8b/layer-22': {feature: 12482, d: 1.078, cos: 0.655, top200: 0.875, controls: null, steering: 'done, verdict pending (results on the feature page)'},
   'gemma-3-4b-it/layer-19': {feature: 12903, d: 0.928, cos: 0.471, top200: 0.94, controls: true, steering: 'controls NEI'},
+  'deepseek-r1-distill-llama-8b/layer-16': {feature: 25071, d: 0.732, cos: 0.403, top200: 0.555, controls: null, steering: 'running'},
 }
 const BASE = 0.199   // share of NEI among the 598,930 training decisions
 const size = (d: number) => { const a = Math.abs(d); return a < 0.2 ? 'negligible' : a < 0.5 ? 'small' : a < 0.8 ? 'medium' : 'large' }

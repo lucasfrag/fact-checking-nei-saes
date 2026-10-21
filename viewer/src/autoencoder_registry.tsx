@@ -5,7 +5,7 @@ import { Feature } from './types';
 // `feature` = the model's candidate NEI feature (opened by default when the model is selected).
 export const MODELS: {[key: string]: {layer: number, label: string, hf: string, feature?: number}} = {
   'llama-3.1-8b-instruct': {layer: 15, label: 'Llama-3.1-8B-Instruct · layer 15', hf: 'meta-llama/Llama-3.1-8B-Instruct', feature: 19219},
-  // 'deepseek-r1-distill-llama-8b': {layer: 15, label: 'DeepSeek-R1-Distill-Llama-8B · layer 15', hf: 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B'},   // removido 06/10/2026: DeepSeek sendo refeito do zero
+  'deepseek-r1-distill-llama-8b': {layer: 16, label: 'DeepSeek-R1-Distill-Llama-8B · layer 16', hf: 'deepseek-ai/DeepSeek-R1-Distill-Llama-8B', feature: 25071},   // refeito sem raciocínio (21/10/2026)
   'qwen3-8b': {layer: 22, label: 'Qwen3-8B · layer 22', hf: 'Qwen/Qwen3-8B', feature: 12482},
   'gemma-3-4b-it': {layer: 19, label: 'Gemma-3-4B-it · layer 19', hf: 'google/gemma-3-4b-it', feature: 12903},
   // 'gemma-4-e4b-it': {layer: ?, label: 'Gemma-4-E4B-it · layer ?', hf: 'google/gemma-4-E4B-it'},
@@ -17,7 +17,7 @@ export const STEERED: {[path: string]: number[]} = {
   'llama-3.1-8b-instruct/layer-15': [19219],
   'qwen3-8b/layer-22': [12482],
   'gemma-3-4b-it/layer-19': [12903],
-  // 'deepseek-r1-distill-llama-8b/layer-15': [18658, 32642, 25349, 19789, 7531],   // sem evidência (FAQ 22)
+  'deepseek-r1-distill-llama-8b/layer-16': [25071],
 };
 
 export const FC_FAMILY = {

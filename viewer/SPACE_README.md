@@ -21,7 +21,7 @@ Interactive viewer for the features of **domain TopK sparse autoencoders** train
 instruction-tuned LLMs while they read **fact-checking verdict prompts** (claim + evidence + instructions), built to
 study **when the model judges the evidence is not enough** to decide (NEI, "NOT ENOUGH EVIDENCE"). For each of the 32,768 features: activation statistics at the verdict-decision
 position, histogram split by gold label (NEI vs. SUP/REF), top and random activating claims with their gold labels,
-logit effects and nearest features. Start with feature **19219** (Llama-3.1-8B-Instruct, layer 15), the NEI feature (confirmed by steering), feature **12482** (Qwen3-8B, layer 22) or feature **12903** (Gemma-3-4B, layer 19).
+logit effects and nearest features. Start with feature **19219** (Llama-3.1-8B-Instruct, layer 15), the NEI feature (confirmed by steering), feature **12482** (Qwen3-8B, layer 22), feature **12903** (Gemma-3-4B, layer 19) or feature **25071** (DeepSeek-R1-Distill-Llama-8B, layer 16).
 
 - SAEs: [lucasfrag/fact-checking-nei-saes](https://huggingface.co/lucasfrag/fact-checking-nei-saes)
 - Data (incl. the per-feature JSONs this viewer reads): [lucasfrag/fact-checking-nei-saes-data](https://huggingface.co/datasets/lucasfrag/fact-checking-nei-saes-data)

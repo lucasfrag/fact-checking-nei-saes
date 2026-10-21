@@ -25,13 +25,10 @@ const HIGHLIGHTED: {[path: string]: {atom: number, label: string, description: s
     {atom: 12903, label: '12903: the NEI candidate', description: 'Top on cosine and on positive Cohen\'s d; pushes the output towards "Depends", "somewhat", "maybe". Steering CONFIRMED: turning it down removes NEI answers (accuracy without evidence doubles); turning it up makes the model say "not enough evidence".'},
     {atom: 2170, label: '2170: the mirror case', description: 'Largest |Cohen\'s d|, but negative: fires more on SUP/REF claims (evidence enough to decide).'},
   ],
-  // DeepSeek: abstention is spread over several features in this SAE; steering results without evidence (FAQ 22)
-  'deepseek-r1-distill-llama-8b/layer-15': [
-    {atom: 18658, label: '18658: controls NEI', description: 'Steering CONFIRMED in both directions, with the widest range without breaking the model.'},
-    {atom: 32642, label: '32642: controls NEI', description: 'Steering CONFIRMED in both directions.'},
-    {atom: 25349, label: '25349: controls NEI (mirror)', description: 'Steering CONFIRMED: turning it UP makes the model answer NEI LESS.'},
-    {atom: 19789, label: '19789: partial (mirror)', description: 'Steering: only turning it up has an effect (less NEI).'},
-    {atom: 7531, label: '7531: no control', description: 'Strongest link score, but steering it does NOT change NEI: a link is not the same as control.'},
+  'deepseek-r1-distill-llama-8b/layer-16': [
+    {atom: 25071, label: '25071: the NEI candidate', description: 'Top on cosine and on positive Cohen\'s d. Fires on almost every claim (99%): what tells NEI apart is how strongly it fires (mean 0.090 on NEI vs 0.066 SUP and 0.070 REF). Steering running.'},
+    {atom: 10462, label: '10462: the purest top', description: '94% of its 50 strongest claims are NEI, but it separates NEI from SUP/REF worse overall (AUC 0.652 vs 0.704).'},
+    {atom: 3035, label: '3035: the mirror case', description: 'Largest |Cohen\'s d|, but negative: fires more on SUP/REF claims (evidence enough to decide).'},
   ],
 }
 
@@ -40,17 +37,13 @@ const NOTES: {[path: string]: {map?: string, highlighted?: string}} = {
   'llama-3.1-8b-instruct/layer-15': {map: 'Here one star (19219) stands far above all the others.'},
   'qwen3-8b/layer-22': {map: 'As in Llama, one feature (12482) stands out on both selection criteria.'},
   'gemma-3-4b-it/layer-19': {map: 'Weaker signal than Llama and Qwen3: 12903 leads on cosine, and the largest |d| belongs to a mirror feature (2170).'},
-  'deepseek-r1-distill-llama-8b/layer-15': {
-    map: 'Here no single star stands far above the rest: the signal is shared by several features.',
-    highlighted: 'In DeepSeek no single feature does the whole job: several features each carry part of the "not enough evidence" signal. Steering showed that the feature with the strongest link (7531) does not control NEI, while three others do (18658, 32642, 25349).',
-  },
+  'deepseek-r1-distill-llama-8b/layer-16': {map: 'Weaker signal than Llama and Qwen3: 25071 leads on cosine, and the largest |d| belongs to a mirror feature (3035).'},
 }
 
-// steering results (Llama: nb03; DeepSeek: FAQ 22, without evidence)
+// steering results (nb03)
 const STEERING: {[path: string]: {[atom: number]: Verdict}} = {
   'llama-3.1-8b-instruct/layer-15': {19219: 'controls'},
   'gemma-3-4b-it/layer-19': {12903: 'controls'},
-  'deepseek-r1-distill-llama-8b/layer-15': {7531: 'no', 32642: 'controls', 18658: 'controls', 25349: 'controls', 19789: 'partial'},
 }
 
 export default function Welcome() {
